@@ -1,12 +1,19 @@
 import Image from "next/image";
 
-/** "Developed by" credit for Thetigerteam Foundation Technology. */
+/** Footer credits: powered by Solutionmania, developed by Thetigerteam Foundation Technology. */
 export default function DevCredit({ className = "" }: { className?: string }) {
   return (
-    <div className={`flex items-center justify-center gap-2 text-xs text-ink-3 ${className}`}>
-      <span>พัฒนาโดย</span>
-      <Image src="/thetigerteam.svg" alt="" width={22} height={23} className="rounded-sm" />
-      <span className="font-semibold text-ink">Thetigerteam Foundation Technology</span>
+    <div className={`flex flex-col items-center gap-1.5 text-xs text-ink-3 ${className}`}>
+      <div className="flex items-center gap-2">
+        <span>powered by</span>
+        <Image src="/solutionmania.png" alt="" width={20} height={20} className="rounded-full" />
+        <span className="font-semibold text-cyan">Solutionmania</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span>พัฒนาโดย</span>
+        <Image src="/thetigerteam.svg" alt="" width={22} height={23} className="rounded-sm" />
+        <span className="font-semibold text-ink">Thetigerteam Foundation Technology</span>
+      </div>
     </div>
   );
 }

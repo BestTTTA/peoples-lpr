@@ -14,12 +14,10 @@ export default function Header() {
     <header className="z-20 border-b border-line bg-surface text-white">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5">
         <Link href="/" className="flex min-w-0 items-center gap-2.5">
-          <Image src="/logo.png" alt="Solutionmania" width={40} height={40} className="rounded-full" priority />
+          <Image src="/peoples-lpr-logo.png" alt="" width={40} height={40} className="rounded-full" priority />
           <div className="min-w-0 leading-tight">
             <div className="truncate text-lg font-bold tracking-tight">Peoples LPR</div>
-            <div className="truncate text-[11px] text-white/60">
-              powered by <span className="font-semibold text-cyan">Solutionmania</span>
-            </div>
+            <div className="truncate text-[11px] text-white/60">ตามหาป้ายทะเบียนที่หาย</div>
           </div>
         </Link>
         <nav className="ml-auto flex shrink-0 gap-1 rounded-xl bg-white/10 p-1">
