@@ -7,13 +7,18 @@ import LocationPicker, { type LatLng } from "@/components/LocationPicker";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
 import UploadGuide from "@/components/UploadGuide";
-import { type Box, cropPlate, preparePhoto } from "@/lib/image";
+import { type Box, cropPlate, detectPlates, preparePhoto } from "@/lib/image";
 import { postForm } from "@/lib/post";
 import { clean, isValidNumber, isValidPrefix, splitPlate } from "@/lib/plate";
 import { isProvince } from "@/lib/provinces";
 import type { OcrResult } from "@/lib/types";
 
-type Photo = { id: string; blob: Blob; url: string; width: number; height: number; boxes: Box[] };
+/** AI detection state of a photo; undefined = not asked (manual mode). */
+type Scan = "busy" | "found" | "none" | "fail";
+
+type Photo = { id: string; blob: Blob; url: string; width: number; height: number; boxes: Box[]; scan?: Scan };
+
+type CropMode = "auto" | "manual";
 
 type Draft = {
   key: string;
@@ -47,9 +52,38 @@ export default function ReportFlow() {
   const [contact, setContact] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [mode, setMode] = useState<CropMode>("auto");
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
 
+  function chooseMode(m: CropMode) {
+    setMode(m);
+    // Switching to auto: scan photos that have neither boxes nor a scan yet.
+    if (m === "auto") photos.filter((p) => !p.scan && p.boxes.length === 0).forEach(scan);
+  }
+
+  function patchPhoto(id: string, patch: Partial<Photo>) {
+    setPhotos((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }
+
+  /** Ask the AI for plate boxes. Boxes the finder drew meanwhile are kept. */
+  async function scan(p: Photo) {
+    patchPhoto(p.id, { scan: "busy" });
+    try {
+      const found = await detectPlates(p);
+      setPhotos((prev) =>
+        prev.map((q) =>
+          q.id !== p.id
+            ? q
+            : { ...q, scan: found.length ? "found" : "none", boxes: q.boxes.length ? q.boxes : found },
+        ),
+      );
+    } catch {
+      patchPhoto(p.id, { scan: "fail" });
+    }
+  }
+
+  const scanning = photos.some((p) => p.scan === "busy");
   const boxCount = photos.reduce((s, p) => s + p.boxes.length, 0);
   const current = photos[active];
   const offset = photos.slice(0, active).reduce((s, p) => s + p.boxes.length, 0);
@@ -69,6 +103,7 @@ export default function ReportFlow() {
       }
       setPhotos((prev) => [...prev, ...added]);
       setActive(photos.length);
+      if (mode === "auto") added.forEach(scan);
       if (files.length > room) setError(`รับไว้ ${room} รูปแรก (สูงสุด ${MAX_PHOTOS} รูป)`);
     } catch {
       setError("เปิดรูปไม่สำเร็จ ลองใช้ไฟล์ JPG หรือ PNG");
@@ -88,6 +123,7 @@ export default function ReportFlow() {
   }
 
   async function readPlates() {
+    if (scanning) return setError("รอ AI หาป้ายให้เสร็จก่อน");
     if (boxCount === 0) return setError("ลากกรอบครอบป้ายอย่างน้อย 1 ป้าย");
     if (boxCount > MAX_PLATES) return setError(`ส่งได้สูงสุด ${MAX_PLATES} ป้ายต่อครั้ง`);
     setError("");
@@ -241,6 +277,27 @@ export default function ReportFlow() {
             }}
           />
 
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1" role="radiogroup" aria-label="วิธีครอบป้าย">
+            {(
+              [
+                ["auto", "🤖 AI ครอปให้", "หาป้ายในรูปอัตโนมัติ"],
+                ["manual", "✍️ ตีกรอบเอง", "ลากครอบทีละป้าย"],
+              ] as const
+            ).map(([m, label, sub]) => (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={mode === m}
+                onClick={() => chooseMode(m)}
+                className={`rounded-lg px-3 py-2 text-left ${mode === m ? "bg-brand text-white" : "text-ink-3 hover:text-ink"}`}
+              >
+                <span className="block text-sm font-semibold">{label}</span>
+                <span className={`block text-xs ${mode === m ? "text-white/80" : ""}`}>{sub}</span>
+              </button>
+            ))}
+          </div>
+
           {photos.length === 0 ? (
             <div
               className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-line px-4 py-10 text-center"
@@ -276,7 +333,7 @@ export default function ReportFlow() {
                       <img src={p.url} alt={`รูปที่ ${i + 1}`} className="h-16 w-20 object-cover" />
                     </button>
                     <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-[10px] text-white">
-                      {p.boxes.length} ป้าย
+                      {p.scan === "busy" ? "AI…" : `${p.boxes.length} ป้าย`}
                     </span>
                     <button
                       type="button"
@@ -302,8 +359,28 @@ export default function ReportFlow() {
 
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="rounded-lg bg-violet/10 px-2 py-1 font-medium text-violet">
-                  ✍️ ลากครอบป้ายทีละป้ายบนรูป
+                  {mode === "manual"
+                    ? "✍️ ลากครอบป้ายทีละป้ายบนรูป"
+                    : current?.scan === "busy"
+                      ? "🤖 AI กำลังหาป้ายในรูปนี้…"
+                      : current?.scan === "none"
+                        ? "🤖 AI หาป้ายไม่เจอ — ลากครอบเองได้"
+                        : current?.scan === "fail"
+                          ? "🤖 AI ใช้งานไม่ได้ตอนนี้ — ลากครอบเองได้"
+                          : "🤖 ตรวจกรอบที่ AI ตีให้ · กด × ลบกรอบผิด · ลากเพิ่มป้ายที่ขาด"}
                 </span>
+                {mode === "auto" && current && current.scan !== "busy" && (
+                  <button
+                    type="button"
+                    className="btn-ghost px-3 py-1.5 text-sm"
+                    onClick={() => {
+                      setBoxes(active, []);
+                      scan({ ...current, boxes: [] });
+                    }}
+                  >
+                    ให้ AI หาใหม่
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn-ghost px-3 py-1.5 text-sm"

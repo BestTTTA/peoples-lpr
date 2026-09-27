@@ -1,4 +1,5 @@
 "use client";
+import { postForm } from "./post";
 
 /** Normalized (0–1) rectangle relative to the photo. */
 export type Box = { x: number; y: number; w: number; h: number };
@@ -40,4 +41,22 @@ export async function cropPlate(photo: Blob, box: Box): Promise<Blob> {
   canvas.getContext("2d")!.drawImage(bmp, x0, y0, sw, sh, 0, 0, canvas.width, canvas.height);
   bmp.close();
   return toJpeg(canvas, 0.92);
+}
+
+/** Plate boxes found by the AI detector (via /api/detect), normalized to the photo. */
+export async function detectPlates(photo: { blob: Blob; width: number; height: number }): Promise<Box[]> {
+  const form = new FormData();
+  form.append("file", photo.blob, "photo.jpg");
+  const { boxes } = await postForm<{ boxes: { box: [number, number, number, number] }[] }>("/api/detect", form);
+  const clamp = (v: number) => Math.min(1, Math.max(0, v));
+  return boxes
+    .map(({ box: [x1, y1, x2, y2] }) => ({
+      x: clamp(x1 / photo.width),
+      y: clamp(y1 / photo.height),
+      w: clamp((x2 - x1) / photo.width),
+      h: clamp((y2 - y1) / photo.height),
+    }))
+    .filter((b) => b.w > 0.01 && b.h > 0.01)
+    // Reading order (top-to-bottom, then left-to-right) so numbering follows the photo.
+    .sort((a, b) => (Math.abs(a.y - b.y) > Math.min(a.h, b.h) / 2 ? a.y - b.y : a.x - b.x));
 }
