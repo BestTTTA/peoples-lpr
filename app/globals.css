@@ -1,26 +1,144 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Dark map-app palette (after the Jetboost CMS Map demo), solid blue accent. */
+@theme {
+  --color-paper: #161616; /* page */
+  --color-surface: #202020; /* panels, cards */
+  --color-surface-2: #2b2b2d; /* inputs, hover, active row */
+  --color-line: #434345;
+  --color-ink: #e7e8ec; /* primary text */
+  --color-ink-3: #a7a8b3; /* secondary text */
+  --color-plate: #111111; /* ink on a physical plate */
+  --color-brand: #2f8fe6;
+  --color-brand-dark: #1f74c4;
+  --color-violet: #9b87ff;
+  --color-cyan: #45b8ea;
+  --color-warn: #f5a524;
+  --font-sans: var(--font-plex), system-ui, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+@utility field {
+  @apply w-full rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-base text-ink outline-none transition placeholder:text-ink-3/70 focus:border-brand focus:ring-2 focus:ring-brand/30;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+@utility btn-primary {
+  @apply btn bg-brand text-white hover:bg-brand-dark;
+}
+
+@utility btn-ghost {
+  @apply btn border border-line bg-surface-2 text-ink hover:bg-line;
+}
+
+@utility card {
+  @apply rounded-2xl border border-line bg-surface;
+}
+
+@utility icon-btn {
+  @apply grid h-8 w-8 place-items-center rounded-full text-ink-3 transition hover:bg-surface-2 hover:text-ink;
+}
+
+/* Scrollbars inside dark panels. */
+.dark-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
+
+/* MapLibre: dark popup and controls (doubled classes to beat maplibre-gl.css). */
+.maplibregl-popup .maplibregl-popup-content {
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  padding: 12px 14px 14px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-plex), sans-serif;
+  box-shadow: none;
+}
+.maplibregl-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.maplibregl-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.maplibregl-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: var(--color-surface);
+}
+.maplibregl-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.maplibregl-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.maplibregl-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: var(--color-surface);
+}
+.maplibregl-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--color-surface);
+}
+.maplibregl-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--color-surface);
+}
+.maplibregl-popup .maplibregl-popup-close-button {
+  color: var(--color-ink-3);
+  font-size: 18px;
+  padding: 0 8px;
+}
+.maplibregl-ctrl-group {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-line);
+}
+.maplibregl-ctrl-group button + button {
+  border-top-color: var(--color-line) !important;
+}
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(1);
+}
+.maplibregl-ctrl-attrib {
+  background: rgb(32 32 32 / 0.8) !important;
+  color: var(--color-ink-3);
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--color-ink-3) !important;
+}
+.maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}
+
+.plate-popup-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+.plate-popup-place,
+.plate-popup-date,
+.plate-popup-hint {
+  font-size: 11px;
+  color: var(--color-ink-3);
+}
+.plate-popup-date {
+  margin-bottom: 6px;
+}
+.plate-popup-hint {
+  margin-top: 8px;
+}
+.plate-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 2px;
+  padding: 1px 7px;
+  border: 1.5px solid var(--color-plate);
+  border-radius: 5px;
+  background: #fff;
+  color: var(--color-plate);
+  line-height: 1.2;
+}
+.plate-chip b {
+  font-size: 13px;
+}
+.plate-chip small {
+  font-size: 9px;
 }

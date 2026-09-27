@@ -1,0 +1,43 @@
+"use client";
+
+/** Normalized (0–1) rectangle relative to the photo. */
+export type Box = { x: number; y: number; w: number; h: number };
+
+const MAX_EDGE = 2000;
+
+function toJpeg(canvas: HTMLCanvasElement, quality = 0.88): Promise<Blob> {
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("encode failed"))), "image/jpeg", quality),
+  );
+}
+
+/** Decode (honouring EXIF rotation), downscale and re-encode an uploaded photo. */
+export async function preparePhoto(file: File): Promise<{ blob: Blob; width: number; height: number }> {
+  const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+  const scale = Math.min(1, MAX_EDGE / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bmp.width * scale);
+  canvas.height = Math.round(bmp.height * scale);
+  canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  bmp.close();
+  return { blob: await toJpeg(canvas), width: canvas.width, height: canvas.height };
+}
+
+/** Cut one plate out of a prepared photo, with a little padding for the OCR model. */
+export async function cropPlate(photo: Blob, box: Box): Promise<Blob> {
+  const bmp = await createImageBitmap(photo);
+  const pad = 0.02;
+  const x0 = Math.max(0, box.x - pad * box.w) * bmp.width;
+  const y0 = Math.max(0, box.y - pad * box.h) * bmp.height;
+  const x1 = Math.min(1, box.x + box.w * (1 + pad)) * bmp.width;
+  const y1 = Math.min(1, box.y + box.h * (1 + pad)) * bmp.height;
+  const sw = Math.max(1, x1 - x0);
+  const sh = Math.max(1, y1 - y0);
+  const scale = Math.min(1, 800 / sw);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(sw * scale);
+  canvas.height = Math.round(sh * scale);
+  canvas.getContext("2d")!.drawImage(bmp, x0, y0, sw, sh, 0, 0, canvas.width, canvas.height);
+  bmp.close();
+  return toJpeg(canvas, 0.92);
+}

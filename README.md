@@ -1,36 +1,33 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Peoples LPR — powered by Solutionmania
 
-## Getting Started
+Developed by Thetigerteam Foundation Technology.
 
-First, run the development server:
+A site for returning lost Thai license plates (e.g. after floods). Finders photograph plates they picked up and pin where they are. Owners search for their plate and see where to collect it.
+
+## Setup
 
 ```bash
+cp .env.example .env.local   # then fill in the keys
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Variable | Purpose |
+| --- | --- |
+| `OCR_API_KEY` | Key for https://ocrapi.roljetson.com (server-side only, never sent to the browser) |
+| `OCR_API_URL` | OCR API base URL |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The map is [OpenFreeMap](https://openfreemap.org/) ("Fiord" style) rendered with MapLibre GL, so no map API key is needed.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## How it works
 
-## Learn More
+- **`/report`**: the finder uploads photos (several plates per photo is fine), draws a box around each plate, and the crops are sent to the OCR API as one batch. The OCR model reads one plate per image, so the boxes are required for multi-plate photos. The finder corrects prefix/number/province (low-confidence fields are highlighted), pins the location via GPS or by tapping the map, and confirms.
+- **`/`**: a full-screen map with a floating panel (layout after the Jetboost CMS Map dark demo). Pins are coloured by how recently the plates were found (green ≤ 3 days, blue ≤ 2 weeks, red older), and each report's place name comes from OpenStreetMap Nominatim at submit time. It is a clustered map of found plates. Pins show only prefix and province. Searching needs prefix + number + province. It returns the photo, pickup note and contact, plus near matches (one character off, or a different province).
 
-To learn more about Next.js, take a look at the following resources:
+## MapLibre worker
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+MapLibre v6 loads its web worker from a separate file, and the bundler can't resolve it. `scripts/copy-maplibre-worker.mjs` copies it into `public/maplibre/`; it runs automatically on `npm install`, `npm run dev` and `npm run build`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Storage
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Reports are kept in `data/reports.json`, and photos in `data/files/`. This is fine for a single server; move to a database and object storage before running more than one instance.
