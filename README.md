@@ -63,5 +63,8 @@ pointing at `http://localhost:3300`.
 - `./docker/deploy.sh` builds the image on the server (arm64), swaps the container, checks
   `/api/reports`, and rolls back on failure.
 - `.github/workflows/deploy.yml` runs lint + build, then joins the tailnet and runs
-  `deploy.sh` over SSH. It needs the same secrets as FaceFinder's workflow:
-  `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `DEPLOY_SSH_KEY_B64`, `DEPLOY_SERVER`, `DEPLOY_USER`.
+  `deploy.sh` over SSH. Secrets: `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET` (Tailscale OAuth
+  client, Auth Keys write, `tag:ci`), `DEPLOY_SSH_KEY_B64` (private key as one base64 line),
+  `DEPLOY_SERVER`, `DEPLOY_USER`.
+- The deploy key is restricted on the server to `docker/ci-deploy.sh` (copied to
+  `~/bin/peoples-lpr-deploy`), so it can only run `deploy <sha>`.

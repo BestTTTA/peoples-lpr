@@ -23,7 +23,7 @@ jobs:
   # Same route as FaceFinder: spark has no public inbound address, so the runner
   # joins the tailnet and the image is built on the (arm64) server itself.
   # Secrets: TS_OAUTH_CLIENT_ID, TS_OAUTH_SECRET, DEPLOY_SSH_KEY_B64 (one base64
-  # line of the private key), DEPLOY_SERVER, DEPLOY_USER, optional DEPLOY_PATH.
+  # line of the private key), DEPLOY_SERVER, DEPLOY_USER.
   deploy:
     name: Deploy to spark
     runs-on: ubuntu-latest
@@ -49,22 +49,11 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null
 
+      # The key is restricted on the server to docker/ci-deploy.sh, which only
+      # accepts "deploy <sha>".
       - name: Build and swap on the server
         env:
           DEPLOY_SERVER: ${{ secrets.DEPLOY_SERVER }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          set -eu
-          path="${DEPLOY_PATH:-\$HOME/Project/peoples-lpr}"
-          SSH_OPTS="-i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes"
-          SSH_OPTS="$SSH_OPTS -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-          SSH_OPTS="$SSH_OPTS -o ConnectTimeout=30 -o LogLevel=ERROR"
-          ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_SERVER" sh -s <<REMOTE
-          set -e
-          cd "$path"
-          git fetch --prune origin
-          git checkout --detach "$GITHUB_SHA"
-          chmod +x docker/deploy.sh
-          ./docker/deploy.sh "$(echo "$GITHUB_SHA" | cut -c1-7)"
-          REMOTE
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null             -o ConnectTimeout=30 -o LogLevel=ERROR             "$DEPLOY_USER@$DEPLOY_SERVER" "deploy $GITHUB_SHA"
