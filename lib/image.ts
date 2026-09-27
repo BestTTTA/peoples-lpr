@@ -33,7 +33,7 @@ export async function cropPlate(photo: Blob, box: Box): Promise<Blob> {
   const y1 = Math.min(1, box.y + box.h * (1 + pad)) * bmp.height;
   const sw = Math.max(1, x1 - x0);
   const sh = Math.max(1, y1 - y0);
-  const scale = Math.min(1, 800 / sw);
+  const scale = Math.min(1, 800 / sw, 800 / sh);
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(sw * scale);
   canvas.height = Math.round(sh * scale);

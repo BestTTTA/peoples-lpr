@@ -8,6 +8,7 @@ import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
 import UploadGuide from "@/components/UploadGuide";
 import { type Box, cropPlate, preparePhoto } from "@/lib/image";
+import { postForm } from "@/lib/post";
 import { clean, isValidNumber, isValidPrefix, splitPlate } from "@/lib/plate";
 import { isProvince } from "@/lib/provinces";
 import type { OcrResult } from "@/lib/types";
@@ -26,7 +27,8 @@ type Draft = {
   provinceConf: number;
 };
 
-const OCR_BATCH = 30;
+// Small requests: a dropped upload on mobile data then costs one retry of a few crops.
+const OCR_BATCH = 8;
 const MAX_PHOTOS = 10;
 const MAX_PLATES = 30;
 const PLATE_CONF_OK = 0.85;
@@ -110,15 +112,16 @@ export default function ReportFlow() {
       }
 
     setBusy(`กำลังอ่านป้ายทะเบียน ${next.length} ป้าย…`);
-    try {
-      for (let i = 0; i < next.length; i += OCR_BATCH) {
-        const chunk = next.slice(i, i + OCR_BATCH);
-        const form = new FormData();
-        chunk.forEach((d) => form.append("file", d.crop, "plate.jpg"));
-        const res = await fetch("/api/ocr", { method: "POST", body: form });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-        (data.results as OcrResult[]).forEach((r, j) => {
+    // Each batch stands alone: if one fails, the others still get read.
+    let failed = 0;
+    let lastError = "";
+    for (let i = 0; i < next.length; i += OCR_BATCH) {
+      const chunk = next.slice(i, i + OCR_BATCH);
+      const form = new FormData();
+      chunk.forEach((d) => form.append("file", d.crop, "plate.jpg"));
+      try {
+        const data = await postForm<{ results: OcrResult[] }>("/api/ocr", form);
+        data.results.forEach((r, j) => {
           const { prefix, number } = splitPlate(r.plate_number);
           Object.assign(chunk[j], {
             prefix,
@@ -128,12 +131,17 @@ export default function ReportFlow() {
             provinceConf: r.province_confidence,
           });
         });
+      } catch (err) {
+        failed += chunk.length;
+        lastError = err instanceof Error && err.message ? err.message : "อ่านป้ายไม่สำเร็จ";
       }
-    } catch (err) {
-      setError(
-        (err instanceof Error && err.message ? err.message : "อ่านป้ายไม่สำเร็จ") + " — กรอกข้อมูลเองได้ด้านล่าง",
-      );
     }
+    if (failed)
+      setError(
+        failed === next.length
+          ? `${lastError} — กรอกข้อมูลเองได้ด้านล่าง`
+          : `อ่านไม่สำเร็จ ${failed} จาก ${next.length} ป้าย (${lastError}) — กรอกป้ายที่ว่างเองได้ด้านล่าง`,
+      );
     setDrafts(next);
     setBusy("");
     setStep(1);
@@ -175,9 +183,8 @@ export default function ReportFlow() {
     used.forEach((i) => form.append("photo", photos[i].blob, "photo.jpg"));
     drafts.forEach((d) => form.append("crop", d.crop, "plate.jpg"));
     try {
-      const res = await fetch("/api/reports", { method: "POST", body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      // One attempt only: a retry after a lost response could save the report twice.
+      const data = await postForm<{ id: string }>("/api/reports", form, 1);
       router.push(`/?report=${data.id}&lat=${location.lat}&lng=${location.lng}`);
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : "บันทึกไม่สำเร็จ");
