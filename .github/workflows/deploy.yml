@@ -56,4 +56,7 @@ jobs:
           DEPLOY_SERVER: ${{ secrets.DEPLOY_SERVER }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         run: |
-          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null             -o ConnectTimeout=30 -o LogLevel=ERROR             "$DEPLOY_USER@$DEPLOY_SERVER" "deploy $GITHUB_SHA"
+          SSH_OPTS="-i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes"
+          SSH_OPTS="$SSH_OPTS -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          SSH_OPTS="$SSH_OPTS -o ConnectTimeout=30 -o LogLevel=ERROR"
+          ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_SERVER" "deploy $GITHUB_SHA"
