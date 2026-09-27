@@ -9,13 +9,29 @@ const plex = IBM_Plex_Sans_Thai({
   weight: ["400", "500", "600", "700"],
 });
 
+const description =
+  "Peoples LPR powered by Solutionmania: แจ้งพบและค้นหาป้ายทะเบียนรถที่หาย พร้อมตำแหน่งบนแผนที่";
+
 export const metadata: Metadata = {
+  // Share previews need absolute image URLs; the image itself is app/opengraph-image.jpg.
+  metadataBase: new URL(process.env.SITE_URL ?? "https://peoples-lpr.roljetson.com"),
   title: "Peoples LPR — ตามหาป้ายทะเบียนหาย",
-  description:
-    "Peoples LPR powered by Solutionmania: แจ้งพบและค้นหาป้ายทะเบียนรถที่หาย พร้อมตำแหน่งบนแผนที่",
+  description,
   applicationName: "Peoples LPR",
   authors: [{ name: "Thetigerteam Foundation Technology" }],
   creator: "Thetigerteam Foundation Technology",
+  openGraph: {
+    type: "website",
+    siteName: "Peoples LPR",
+    locale: "th_TH",
+    title: "ช่วยตามหาป้ายทะเบียน — Peoples LPR",
+    description,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ช่วยตามหาป้ายทะเบียน — Peoples LPR",
+    description,
+  },
 };
 
 export const viewport: Viewport = {
