@@ -9,11 +9,14 @@
     "prebuild": "node scripts/copy-maplibre-worker.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "tunnel": "ssh -N -o ExitOnForwardFailure=yes -L 15555:127.0.0.1:5555 sparkle@100.68.248.102"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1141.0",
     "maplibre-gl": "^6.11.2",
     "next": "16.3.6",
+    "pg": "^8.23.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1"
@@ -21,6 +24,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

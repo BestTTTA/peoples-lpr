@@ -1,0 +1,31 @@
+# Runs on the spark server next to FaceFinder, sharing its Postgres and MinIO
+# (own database and bucket). Deploy with ./docker/deploy.sh.
+#
+# The port is bound to loopback: the public route is the Cloudflare tunnel
+# (host network) pointing at http://localhost:${APP_PORT}.
+services:
+  web:
+    image: ${DOCKER_IMAGE:-peoples-lpr:latest}
+    container_name: peoples-lpr
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      - "127.0.0.1:${APP_PORT:-3300}:3000"
+    env_file:
+      - .env
+    environment:
+      # In-network addresses win over .env, which may describe a laptop + tunnel.
+      DATABASE_URL: postgresql://${PG_USER:-peoples_lpr}:${PG_PASSWORD:?}@postgres:5432/${PG_DB:-peoples_lpr}
+      S3_ENDPOINT: http://minio:9000
+    mem_limit: 512m
+    networks:
+      - facefinder
+
+networks:
+  facefinder:
+    name: repo_default
+    external: true

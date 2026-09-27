@@ -1,0 +1,9 @@
+.git
+.github
+.next
+node_modules
+data
+public/maplibre
+.env*
+!.env.example
+*.tsbuildinfo

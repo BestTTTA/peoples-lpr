@@ -1,0 +1,70 @@
+name: CI/CD Peoples LPR
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Lint and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  # Same route as FaceFinder: spark has no public inbound address, so the runner
+  # joins the tailnet and the image is built on the (arm64) server itself.
+  # Secrets: TS_OAUTH_CLIENT_ID, TS_OAUTH_SECRET, DEPLOY_SSH_KEY_B64 (one base64
+  # line of the private key), DEPLOY_SERVER, DEPLOY_USER, optional DEPLOY_PATH.
+  deploy:
+    name: Deploy to spark
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Install the deploy key
+        env:
+          DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY_B64 }}
+        run: |
+          if [ -z "${DEPLOY_SSH_KEY_B64:-}" ]; then
+            echo "::error::the DEPLOY_SSH_KEY_B64 secret is empty"
+            exit 1
+          fi
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s' "$DEPLOY_SSH_KEY_B64" | tr -d ' \t\r\n' | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null
+
+      - name: Build and swap on the server
+        env:
+          DEPLOY_SERVER: ${{ secrets.DEPLOY_SERVER }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -eu
+          path="${DEPLOY_PATH:-\$HOME/Project/peoples-lpr}"
+          SSH_OPTS="-i $HOME/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes"
+          SSH_OPTS="$SSH_OPTS -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+          SSH_OPTS="$SSH_OPTS -o ConnectTimeout=30 -o LogLevel=ERROR"
+          ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_SERVER" sh -s <<REMOTE
+          set -e
+          cd "$path"
+          git fetch --prune origin
+          git checkout --detach "$GITHUB_SHA"
+          chmod +x docker/deploy.sh
+          ./docker/deploy.sh "$(echo "$GITHUB_SHA" | cut -c1-7)"
+          REMOTE
