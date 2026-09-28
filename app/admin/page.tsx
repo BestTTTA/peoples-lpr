@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import AdminLogin from "@/components/admin/AdminLogin";
 import AdminPanel from "@/components/admin/AdminPanel";
 import { adminEnabled, isAdmin } from "@/lib/admin";
@@ -9,6 +10,9 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminPage() {
+  // Per request: ADMIN_PASSWORD is a runtime setting (absent when the image is
+  // built), so this page must never be prerendered.
+  await connection();
   const body = !adminEnabled() ? (
     <div className="card mx-auto mt-10 max-w-md p-5 text-sm">
       <h1 className="mb-2 text-lg font-bold">หน้าตั้งค่ายังไม่เปิดใช้งาน</h1>
