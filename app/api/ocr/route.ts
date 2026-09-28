@@ -1,6 +1,7 @@
+import { MAX_PLATES } from "@/lib/limits";
 import type { OcrResult } from "@/lib/types";
 
-const MAX_FILES = 30;
+const MAX_FILES = MAX_PLATES;
 const MAX_BYTES = 4 * 1024 * 1024;
 // The OCR API rejects requests with more than 8 images (HTTP 400).
 const UPSTREAM_BATCH = Number(process.env.OCR_MAX_BATCH ?? 8);

@@ -8,6 +8,7 @@ import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
 import UploadGuide from "@/components/UploadGuide";
 import { type Box, cropPlate, detectPlates, preparePhoto } from "@/lib/image";
+import { MAX_PLATES } from "@/lib/limits";
 import { postForm } from "@/lib/post";
 import { reportPath } from "@/lib/urls";
 import { clean, isValidNumber, isValidPrefix, splitPlate } from "@/lib/plate";
@@ -36,7 +37,6 @@ type Draft = {
 // Small requests: a dropped upload on mobile data then costs one retry of a few crops.
 const OCR_BATCH = 8;
 const MAX_PHOTOS = 10;
-const MAX_PLATES = 30;
 const PLATE_CONF_OK = 0.85;
 const PROVINCE_CONF_OK = 0.6;
 

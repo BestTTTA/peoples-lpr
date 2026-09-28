@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { MAX_PLATES } from "@/lib/limits";
 import { clean, isValidNumber, isValidPrefix } from "@/lib/plate";
 import { isProvince } from "@/lib/provinces";
 import { reverseGeocode } from "@/lib/geocode";
@@ -6,7 +7,6 @@ import { addReport, listReports, saveFile } from "@/lib/store";
 import type { Plate, PublicReport, Report } from "@/lib/types";
 
 const MAX_PHOTOS = 10;
-const MAX_PLATES = 30;
 const MAX_BYTES = 6 * 1024 * 1024;
 
 export async function GET() {
