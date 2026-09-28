@@ -2,6 +2,7 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import type {
   DataDrivenPropertyValueSpecification,
+  ExpressionSpecification,
   FilterSpecification,
   GeoJSONSource,
   MapGeoJSONFeature,
@@ -13,6 +14,8 @@ import { useEffect, useRef, useState } from "react";
 import { BRAND, FONT, createMap } from "@/lib/maps";
 import { RECENCY, type Recency, pinSvg, recencyOf } from "@/lib/recency";
 import type { PublicReport } from "@/lib/types";
+import { type Spot, toSpots } from "@/lib/spots";
+import { href, searchPath } from "@/lib/urls";
 
 export type Focus = { lat: number; lng: number; reportIds: string[] };
 
@@ -24,16 +27,29 @@ const esc = (s: string) =>
 
 const dateFmt = new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "short" });
 
-function popupHtml(r: PublicReport): string {
-  const chips = r.plates
-    .map((p) => `<span class="plate-chip"><b>${esc(p.prefix)} ••••</b><small>${esc(p.province)}</small></span>`)
+const POPUP_CHIPS = 60;
+
+function popupHtml(spot: Spot): string {
+  const { plates } = spot;
+  const chips = plates
+    .slice(0, POPUP_CHIPS)
+    .map(
+      (p) =>
+        `<a class="plate-chip" href="${esc(href(searchPath(p.prefix, p.number, p.province)))}"><b>${esc(
+          `${p.prefix} ${p.number}`,
+        )}</b><small>${esc(p.province)}</small></a>`,
+    )
     .join("");
+  const more = plates.length - POPUP_CHIPS;
   return `<div>
-    <div class="plate-popup-title">พบป้ายทะเบียน ${r.plates.length} ป้าย</div>
-    ${r.place ? `<div class="plate-popup-place">${esc(r.place)}</div>` : ""}
-    <div class="plate-popup-date">${esc(dateFmt.format(new Date(r.createdAt)))}</div>
-    <div>${chips}</div>
-    <div class="plate-popup-hint">กรอกหมวด เลขทะเบียน และจังหวัดให้ครบ เพื่อดูรูปและวิธีรับคืน</div>
+    <div class="plate-popup-title">พบป้ายทะเบียน ${plates.length} ป้าย${
+      spot.reportIds.length > 1 ? ` <small>(แจ้ง ${spot.reportIds.length} ครั้ง)</small>` : ""
+    }</div>
+    ${spot.place ? `<div class="plate-popup-place">${esc(spot.place)}</div>` : ""}
+    <div class="plate-popup-date">ล่าสุด ${esc(dateFmt.format(new Date(spot.createdAt)))}</div>
+    <div class="plate-popup-chips">${chips}</div>
+    ${more > 0 ? `<div class="plate-popup-hint">และอีก ${more} ป้าย</div>` : ""}
+    <div class="plate-popup-hint">แตะป้ายเพื่อดูจุดรับคืนและช่องทางติดต่อ</div>
   </div>`;
 }
 
@@ -41,10 +57,17 @@ function toGeoJSON(reports: PublicReport[]): GeoJSON.FeatureCollection<GeoJSON.P
   const now = Date.now();
   return {
     type: "FeatureCollection",
-    features: reports.map((r) => ({
+    // One pin per spot, so stacked reports can't hide each other's counts.
+    features: toSpots(reports).map((spot) => ({
       type: "Feature",
-      geometry: { type: "Point", coordinates: [r.lng, r.lat] },
-      properties: { id: r.id, plates: r.plates.length, icon: `pin-${recencyOf(r.createdAt, now)}` },
+      geometry: { type: "Point", coordinates: [spot.lng, spot.lat] },
+      properties: {
+        id: spot.id,
+        // Delimited so a filter can test membership with a substring match.
+        ids: `,${spot.reportIds.join(",")},`,
+        plates: spot.plates.length,
+        icon: `pin-${recencyOf(spot.createdAt, now)}`,
+      },
     })),
   };
 }
@@ -58,10 +81,11 @@ async function svgImage(svg: string, px: number): Promise<HTMLImageElement> {
   return img;
 }
 
+/** Spots holding any of these reports. */
 const byIds = (ids: string[]): FilterSpecification => [
   "all",
   ["!", ["has", "point_count"]],
-  ["in", ["get", "id"], ["literal", ids]],
+  ["any", false, ...ids.map((id): ExpressionSpecification => ["in", `,${id},`, ["get", "ids"]])],
 ];
 
 export default function FoundMap({
@@ -198,11 +222,14 @@ export default function FoundMap({
     if (!focus) return;
     map.flyTo({ center: [focus.lng, focus.lat], zoom: Math.max(map.getZoom(), 16.5), essential: true });
     const r = focus.reportIds.length === 1 ? reportsRef.current.find((x) => x.id === focus.reportIds[0]) : undefined;
-    if (r && mlRef.current)
-      popupRef.current = new mlRef.current.Popup({ offset: 28, maxWidth: "280px" })
-        .setLngLat([r.lng, r.lat])
-        .setHTML(popupHtml(r))
+    if (r && mlRef.current) {
+      // The popup covers the whole spot, like the pin does.
+      const spot = toSpots(reportsRef.current).find((x) => x.reportIds.includes(r.id)) ?? { ...r, reportIds: [r.id] };
+      popupRef.current = new mlRef.current.Popup({ offset: 28, maxWidth: "300px" })
+        .setLngLat([spot.lng, spot.lat])
+        .setHTML(popupHtml(spot))
         .addTo(map);
+    }
   }, [map, focus]);
 
   return (

@@ -7,6 +7,7 @@ import ProvinceInput from "@/components/ProvinceInput";
 import { timeAgo } from "@/components/ReportCard";
 import { clean } from "@/lib/plate";
 import { RECENCY, recencyOf } from "@/lib/recency";
+import { toSpots } from "@/lib/spots";
 import type { PublicReport } from "@/lib/types";
 import { href, reportPath, searchPath } from "@/lib/urls";
 
@@ -31,7 +32,8 @@ export default function Dashboard() {
       .catch(() => setError("โหลดข้อมูลไม่สำเร็จ ลองรีเฟรชหน้า"));
   }, []);
 
-  const all = useMemo(() => reports ?? [], [reports]);
+  // By spot: reports sent from the same place are one card, as on the map.
+  const all = useMemo(() => toSpots(reports ?? []), [reports]);
 
   const stats = useMemo(() => {
     const plates = all.flatMap((r) => r.plates);
@@ -41,10 +43,13 @@ export default function Dashboard() {
       plates: plates.length,
       points: all.length,
       provinces: byProvince.size,
-      fresh: all.filter((r) => recencyOf(r.createdAt) === "new").reduce((s, r) => s + r.plates.length, 0),
+      // Per report: a spot can mix old and new reports.
+      fresh: (reports ?? [])
+        .filter((r) => recencyOf(r.createdAt) === "new")
+        .reduce((s, r) => s + r.plates.length, 0),
       top: [...byProvince.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8),
     };
-  }, [all]);
+  }, [all, reports]);
 
   // Each point keeps only the plates that match; points with none drop out.
   const groups = useMemo(() => {
@@ -163,6 +168,7 @@ export default function Dashboard() {
       <div className="grid items-start gap-3 md:grid-cols-2">
         {groups.map(({ report, plates }) => {
           const recency = RECENCY[recencyOf(report.createdAt)];
+          const times = report.reportIds.length;
           const open = expanded.has(report.id);
           const visible = open ? plates : plates.slice(0, PREVIEW);
           return (
@@ -178,7 +184,8 @@ export default function Dashboard() {
                     {report.place || `${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}`}
                   </h3>
                   <p className="text-xs text-ink-3">
-                    แจ้งพบ {timeAgo(report.createdAt)} ·{" "}
+                    {times > 1 ? `แจ้ง ${times} ครั้ง · ล่าสุด ` : "แจ้งพบ "}
+                    {timeAgo(report.createdAt)} ·{" "}
                     {plates.length === report.plates.length
                       ? `${plates.length} ป้าย`
                       : `ตรง ${plates.length} จาก ${report.plates.length} ป้าย`}

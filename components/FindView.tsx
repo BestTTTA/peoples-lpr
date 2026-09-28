@@ -8,6 +8,7 @@ import ReportCard, { RecencyBadge, timeAgo } from "@/components/ReportCard";
 import SearchHint from "@/components/SearchHint";
 import { clean, isValidNumber, isValidPrefix } from "@/lib/plate";
 import { RECENCY } from "@/lib/recency";
+import { toSpots } from "@/lib/spots";
 import type { PublicReport, SearchHit } from "@/lib/types";
 import { type PlateQuery, href, searchPath } from "@/lib/urls";
 
@@ -59,6 +60,9 @@ export default function FindView({
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [reports, filterProvince],
   );
+  // The list and the counts go by spot (reports from one place merged), like the map pins.
+  const spots = useMemo(() => toSpots(visible), [visible]);
+  const spotTotal = useMemo(() => toSpots(reports).length, [reports]);
 
   const prefixOk = isValidPrefix(prefix);
   const numberOk = isValidNumber(number);
@@ -72,7 +76,10 @@ export default function FindView({
     setFocus({ lat: r.lat, lng: r.lng, reportIds: [id] });
     if (scroll) {
       setPanelOpen(true);
-      requestAnimationFrame(() => cardRefs.current.get(id)?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+      const spotId = spots.find((s) => s.reportIds.includes(id))?.id ?? id;
+      requestAnimationFrame(() =>
+        cardRefs.current.get(spotId)?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
+      );
     }
   }
 
@@ -170,7 +177,7 @@ export default function FindView({
                 <h1 className="text-xl font-bold">ตามหาป้ายทะเบียน</h1>
                 <p className="text-sm text-ink-3">
                   พบแล้ว <b className="text-ink">{plateTotal.toLocaleString("th-TH")}</b> ป้าย ·{" "}
-                  {reports.length.toLocaleString("th-TH")} จุด
+                  {spotTotal.toLocaleString("th-TH")} จุด
                 </p>
               </div>
               <button
@@ -293,7 +300,7 @@ export default function FindView({
               <section className="flex flex-col">
                 <div className="mb-1 flex items-center justify-between">
                   <h2 className="text-lg font-bold">จุดที่พบป้ายล่าสุด</h2>
-                  <span className="text-xs text-ink-3">{visible.length} จุด</span>
+                  <span className="text-xs text-ink-3">{spots.length} จุด</span>
                 </div>
                 <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-3">
                   {Object.values(RECENCY).map((r) => (
@@ -303,12 +310,12 @@ export default function FindView({
                     </span>
                   ))}
                 </div>
-                {visible.length === 0 && (
+                {spots.length === 0 && (
                   <p className="rounded-xl bg-surface-2 p-3 text-sm text-ink-3">
                     {filterProvince ? `ยังไม่มีผู้แจ้งพบป้ายจังหวัด${filterProvince}` : "ยังไม่มีผู้แจ้งพบป้าย"}
                   </p>
                 )}
-                {visible.slice(0, LIST_LIMIT).map((r) => (
+                {spots.slice(0, LIST_LIMIT).map((r) => (
                   <div
                     key={r.id}
                     ref={(el) => {
@@ -316,7 +323,11 @@ export default function FindView({
                       else cardRefs.current.delete(r.id);
                     }}
                   >
-                    <ReportCard report={r} active={selected === r.id} onClick={() => select(r.id)} />
+                    <ReportCard
+                      report={r}
+                      active={selected !== null && r.reportIds.includes(selected)}
+                      onClick={() => select(r.id)}
+                    />
                   </div>
                 ))}
               </section>

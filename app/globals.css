@@ -136,8 +136,23 @@ body {
   color: var(--color-plate);
   line-height: 1.2;
 }
+a.plate-chip {
+  text-decoration: none;
+}
+a.plate-chip:hover {
+  outline: 2px solid var(--color-brand);
+}
 .plate-chip b {
   font-size: 13px;
+}
+.plate-popup-title small {
+  font-weight: 400;
+  color: var(--color-ink-3);
+}
+/* A busy spot can hold hundreds of plates; keep the popup on screen. */
+.plate-popup-chips {
+  max-height: 190px;
+  overflow-y: auto;
 }
 .plate-chip small {
   font-size: 9px;
