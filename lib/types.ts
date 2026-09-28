@@ -25,14 +25,14 @@ export type Report = {
   plates: Plate[];
 };
 
-/** What the public map gets: no plate numbers, no photos, no contact. */
+/** What the public map and dashboard get: plate text, but no photos and no contact. */
 export type PublicReport = {
   id: string;
   createdAt: string;
   lat: number;
   lng: number;
   place: string;
-  plates: { prefix: string; province: string }[];
+  plates: { prefix: string; number: string; province: string }[];
 };
 
 export type SearchHit = {

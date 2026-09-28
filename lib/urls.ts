@@ -5,6 +5,7 @@ import { filterProvinces, isProvince } from "./provinces";
 // path words there in step with these.
 
 export const REPORT_PATH = "/แจ้งพบป้าย";
+export const FOUND_PATH = "/ป้ายที่พบ";
 
 /** /ค้นหา/3ฒน-5702-กรุงเทพมหานคร */
 export function searchPath(prefix: string, number: string, province: string): string {

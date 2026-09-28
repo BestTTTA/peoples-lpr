@@ -17,8 +17,8 @@ export async function GET() {
     lat: r.lat,
     lng: r.lng,
     place: r.place ?? "",
-    // The number is withheld: finding your plate requires searching all three parts.
-    plates: r.plates.map((p) => ({ prefix: p.prefix, province: p.province })),
+    // Plate text is public (the dashboard lists it); pickup details come from /api/search.
+    plates: r.plates.map((p) => ({ prefix: p.prefix, number: p.number, province: p.province })),
   }));
   return Response.json(out);
 }

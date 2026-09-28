@@ -24,7 +24,7 @@ export function RecencyBadge({ createdAt, size = 22 }: { createdAt: string; size
   );
 }
 
-/** List row for a found-plates pin: masked plate thumbnail, count, place, time. */
+/** List row for a found-plates pin: plate thumbnail, count, place, time. */
 export default function ReportCard({
   report,
   active,
@@ -36,7 +36,10 @@ export default function ReportCard({
 }) {
   const first = report.plates[0];
   const more = report.plates.length - 1;
-  const prefixes = [...new Set(report.plates.map((p) => p.prefix))].slice(0, 4).join(", ");
+  const prefixes = report.plates
+    .slice(0, 3)
+    .map((p) => `${p.prefix} ${p.number}`)
+    .join(", ");
   return (
     <button
       type="button"
@@ -48,7 +51,9 @@ export default function ReportCard({
       <span className="relative shrink-0">
         <span className="grid h-[70px] w-[70px] place-items-center rounded-[3px] bg-[#34363b]">
           <span className="flex flex-col items-center rounded-[3px] border border-plate bg-white px-1.5 leading-tight text-plate">
-            <b className="text-[13px] whitespace-nowrap">{first.prefix} ••••</b>
+            <b className="text-[12px] whitespace-nowrap">
+              {first.prefix} {first.number}
+            </b>
             <span className="max-w-[54px] truncate text-[7px]">{first.province}</span>
           </span>
           {more > 0 && (

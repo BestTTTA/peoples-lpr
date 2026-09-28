@@ -2,10 +2,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { REPORT_PATH } from "@/lib/urls";
+import { FOUND_PATH, REPORT_PATH } from "@/lib/urls";
 
 const TABS = [
   { href: "/", label: "ค้นหาป้ายหาย", short: "ค้นหา" },
+  { href: FOUND_PATH, label: "ป้ายที่พบ", short: "รายการ" },
   { href: REPORT_PATH, label: "แจ้งพบป้าย", short: "แจ้งพบ" },
 ];
 
@@ -28,7 +29,8 @@ export default function Header() {
         </Link>
         <nav className="ml-auto flex shrink-0 gap-1 rounded-xl bg-white/10 p-1">
           {TABS.map((t) => {
-            const active = t.href === "/" ? !path.startsWith(REPORT_PATH) : path.startsWith(t.href);
+            const active =
+              t.href === "/" ? !TABS.some((o) => o.href !== "/" && path.startsWith(o.href)) : path.startsWith(t.href);
             return (
               <Link
                 key={t.href}
