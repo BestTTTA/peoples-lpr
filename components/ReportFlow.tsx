@@ -7,7 +7,7 @@ import LocationPicker, { type LatLng } from "@/components/LocationPicker";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
 import UploadGuide from "@/components/UploadGuide";
-import { type Box, cropPlate, detectPlates, preparePhoto } from "@/lib/image";
+import { type Box, cropPlate, detectPlates, preparePhoto, rotateBox, rotatePhoto } from "@/lib/image";
 import { MAX_PLATES } from "@/lib/limits";
 import { postForm } from "@/lib/post";
 import { reportPath } from "@/lib/urls";
@@ -38,6 +38,10 @@ type Draft = {
   province: string;
   plateConf: number;
   provinceConf: number;
+  /** The finder looked at it (accepted or edited): uncertainty no longer flags it. */
+  reviewed?: boolean;
+  /** Left out of the report. */
+  skipped?: boolean;
 };
 
 // Small requests: a dropped upload on mobile data then costs one retry of a few crops.
@@ -59,6 +63,8 @@ export default function ReportFlow() {
   const [contact, setContact] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  /** Review step: show only the plates still flagged yellow. */
+  const [onlyFlagged, setOnlyFlagged] = useState(false);
   const [mode, setMode] = useState<CropMode>("auto");
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -122,6 +128,28 @@ export default function ReportFlow() {
 
   function setBoxes(i: number, boxes: Box[]) {
     setPhotos((prev) => prev.map((p, j) => (j === i ? { ...p, boxes } : p)));
+  }
+
+  /** Turn the photo 90° clockwise; drawn boxes turn with it. In AI mode, look again (upright plates detect better). */
+  async function rotate(i: number) {
+    const p = photos[i];
+    if (!p || p.scan === "busy") return;
+    setBusy("กำลังหมุนรูป…");
+    try {
+      const r = await rotatePhoto(p.blob);
+      URL.revokeObjectURL(p.url);
+      const turned: Photo = { ...p, ...r, url: URL.createObjectURL(r.blob), boxes: p.boxes.map(rotateBox) };
+      if (mode === "auto") {
+        turned.boxes = [];
+        turned.scan = undefined;
+      }
+      setPhotos((prev) => prev.map((q) => (q.id === p.id ? turned : q)));
+      if (mode === "auto") scan(turned);
+    } catch {
+      setError("หมุนรูปไม่สำเร็จ");
+    } finally {
+      setBusy("");
+    }
   }
 
   function removePhoto(i: number) {
@@ -192,7 +220,7 @@ export default function ReportFlow() {
   }
 
   function editDraft(key: string, patch: Partial<Draft>) {
-    setDrafts((prev) => prev.map((d) => (d.key === key ? { ...d, ...patch } : d)));
+    setDrafts((prev) => prev.map((d) => (d.key === key ? { ...d, reviewed: true, ...patch } : d)));
   }
 
   function removeDraft(key: string) {
@@ -200,14 +228,28 @@ export default function ReportFlow() {
   }
 
   const draftValid = (d: Draft) => isValidPrefix(d.prefix) && isValidNumber(d.number) && isProvince(d.province);
-  const allValid = drafts.length > 0 && drafts.every(draftValid);
+  const lowConf = (d: Draft) => d.plateConf < PLATE_CONF_OK || d.provinceConf < PROVINCE_CONF_OK;
+  /** Yellow: incomplete, or the reader was unsure and nobody has looked yet. */
+  const flagged = (d: Draft) => !d.skipped && (!draftValid(d) || (!d.reviewed && lowConf(d)));
+  const kept = drafts.filter((d) => !d.skipped);
+  const flaggedCount = drafts.filter(flagged).length;
+  const allValid = kept.length > 0 && kept.every(draftValid);
+
+  /** Skip reviewing: keep complete readings as they are, leave out the incomplete ones, and go on. */
+  function skipFlagged() {
+    const next = drafts.map((d) => (flagged(d) ? (draftValid(d) ? { ...d, reviewed: true } : { ...d, skipped: true }) : d));
+    setDrafts(next);
+    setOnlyFlagged(false);
+    if (next.some((d) => !d.skipped)) setStep(2);
+    else setError("ไม่มีป้ายที่อ่านได้ครบ — แก้อย่างน้อย 1 ป้ายก่อน");
+  }
 
   async function submit() {
     if (!location) return setError("กรุณาปักหมุดตำแหน่งที่พบป้าย");
     setError("");
     setBusy("กำลังบันทึก…");
     // Only send photos that still have at least one plate, and re-index.
-    const used = [...new Set(drafts.map((d) => d.photo))].sort((a, b) => a - b);
+    const used = [...new Set(kept.map((d) => d.photo))].sort((a, b) => a - b);
     const form = new FormData();
     form.append(
       "meta",
@@ -216,7 +258,7 @@ export default function ReportFlow() {
         lng: location.lng,
         note: note.trim(),
         contact: contact.trim(),
-        plates: drafts.map((d) => ({
+        plates: kept.map((d) => ({
           prefix: clean(d.prefix),
           number: clean(d.number),
           province: d.province,
@@ -225,7 +267,7 @@ export default function ReportFlow() {
       }),
     );
     used.forEach((i) => form.append("photo", photos[i].blob, "photo.jpg"));
-    drafts.forEach((d) => form.append("crop", d.crop, "plate.jpg"));
+    kept.forEach((d) => form.append("crop", d.crop, "plate.jpg"));
     try {
       // One attempt only: a retry after a lost response could save the report twice.
       const data = await postForm<{ id: string }>("/api/reports", form, 1);
@@ -394,6 +436,15 @@ export default function ReportFlow() {
                 <button
                   type="button"
                   className="btn-ghost px-3 py-1.5 text-sm"
+                  title="หมุนรูปตามเข็มนาฬิกา 90°"
+                  disabled={!!busy || current.scan === "busy"}
+                  onClick={() => rotate(active)}
+                >
+                  ↻ หมุนรูป
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost px-3 py-1.5 text-sm"
                   onClick={() => setBoxes(active, [...current.boxes, { x: 0, y: 0, w: 1, h: 1 }])}
                 >
                   ทั้งรูปคือ 1 ป้าย
@@ -407,7 +458,7 @@ export default function ReportFlow() {
 
               {current && (
                 <CropEditor
-                  key={current.id}
+                  key={current.url}
                   src={current.url}
                   width={current.width}
                   height={current.height}
@@ -428,11 +479,58 @@ export default function ReportFlow() {
             คือระบบไม่แน่ใจ
           </p>
           {drafts.length === 0 && <div className="card p-4 text-sm">ไม่มีป้ายเหลืออยู่ — กลับไปตีกรอบใหม่</div>}
+          {(flaggedCount > 0 || onlyFlagged) && (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-warn/50 bg-warn/10 p-3 text-sm">
+              <span className="font-semibold">
+                {flaggedCount > 0 ? `⚠️ มี ${flaggedCount} ป้ายที่ระบบไม่แน่ใจ (สีเหลือง)` : "✓ ตรวจครบแล้ว"}
+              </span>
+              <div className="ml-auto flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn-ghost px-3 py-1.5 text-sm"
+                  onClick={() => setOnlyFlagged(!onlyFlagged)}
+                >
+                  {onlyFlagged ? "แสดงทุกป้าย" : "ตรวจแก้ทีละป้าย"}
+                </button>
+                {flaggedCount > 0 && (
+                  <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={skipFlagged}>
+                    ข้ามทั้งหมดแล้วไปต่อ
+                  </button>
+                )}
+              </div>
+              {flaggedCount > 0 && (
+                <p className="w-full text-xs text-ink-3">
+                  “ข้าม” = ใช้ค่าที่ระบบอ่านได้ตามเดิม ส่วนป้ายที่อ่านไม่ครบ (ไม่มีเลขหรือจังหวัด) จะไม่ถูกส่ง
+                </p>
+              )}
+            </div>
+          )}
           {drafts.map((d, i) => {
-            const lowPlate = d.plateConf < PLATE_CONF_OK;
-            const lowProvince = d.provinceConf < PROVINCE_CONF_OK;
+            if (onlyFlagged && !flagged(d)) return null;
+            const lowPlate = d.plateConf < PLATE_CONF_OK && !d.reviewed;
+            const lowProvince = d.provinceConf < PROVINCE_CONF_OK && !d.reviewed;
+            if (d.skipped)
+              return (
+                <article key={d.key} className="card flex items-center gap-3 p-3 opacity-60">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- local blob URL */}
+                  <img src={d.cropUrl} alt={`ป้ายที่ ${i + 1}`} className="h-12 w-20 rounded object-contain" />
+                  <span className="flex-1 text-sm">
+                    ป้ายที่ {i + 1} · ข้ามแล้ว — ป้ายนี้จะไม่ถูกส่ง
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-ghost px-3 py-1.5 text-sm"
+                    onClick={() => editDraft(d.key, { skipped: false, reviewed: false })}
+                  >
+                    นำกลับมา
+                  </button>
+                </article>
+              );
             return (
-              <article key={d.key} className="card grid gap-3 p-3 sm:grid-cols-[220px_1fr]">
+              <article
+                key={d.key}
+                className={`card grid gap-3 p-3 sm:grid-cols-[220px_1fr] ${flagged(d) ? "border-warn/60" : ""}`}
+              >
                 <div className="flex flex-col gap-2">
                   <div className="relative overflow-hidden rounded-lg bg-surface-2">
                     {/* eslint-disable-next-line @next/next/no-img-element -- local blob URL */}
@@ -489,6 +587,26 @@ export default function ReportFlow() {
                       ลบป้ายนี้
                     </button>
                   </div>
+                  {flagged(d) && (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="btn-primary px-3 py-1.5 text-sm"
+                        disabled={!draftValid(d)}
+                        title={draftValid(d) ? undefined : "กรอกหมวด เลข และจังหวัดให้ครบก่อน"}
+                        onClick={() => editDraft(d.key, { reviewed: true })}
+                      >
+                        ✓ ใช้ค่านี้
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-ghost px-3 py-1.5 text-sm"
+                        onClick={() => editDraft(d.key, { skipped: true })}
+                      >
+                        ข้ามป้ายนี้
+                      </button>
+                    </div>
+                  )}
                 </div>
               </article>
             );
@@ -546,7 +664,9 @@ export default function ReportFlow() {
               (step === 0
                 ? `${photos.length} รูป · ${boxCount} ป้าย`
                 : step === 1
-                  ? `${drafts.filter(draftValid).length}/${drafts.length} ป้ายพร้อม`
+                  ? `${kept.filter(draftValid).length}/${kept.length} ป้ายพร้อม${
+                      drafts.length > kept.length ? ` · ข้าม ${drafts.length - kept.length}` : ""
+                    }`
                   : location
                     ? "พร้อมยืนยัน"
                     : "ยังไม่ได้ปักหมุด")}

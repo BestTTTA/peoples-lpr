@@ -60,3 +60,20 @@ export async function detectPlates(photo: { blob: Blob; width: number; height: n
     // Reading order (top-to-bottom, then left-to-right) so numbering follows the photo.
     .sort((a, b) => (Math.abs(a.y - b.y) > Math.min(a.h, b.h) / 2 ? a.y - b.y : a.x - b.x));
 }
+
+/** Turn a prepared photo 90° clockwise. */
+export async function rotatePhoto(photo: Blob): Promise<{ blob: Blob; width: number; height: number }> {
+  const bmp = await createImageBitmap(photo);
+  const canvas = document.createElement("canvas");
+  canvas.width = bmp.height;
+  canvas.height = bmp.width;
+  const ctx = canvas.getContext("2d")!;
+  ctx.translate(canvas.width, 0);
+  ctx.rotate(Math.PI / 2);
+  ctx.drawImage(bmp, 0, 0);
+  bmp.close();
+  return { blob: await toJpeg(canvas), width: canvas.width, height: canvas.height };
+}
+
+/** Where a box lands when its photo turns 90° clockwise (normalized coordinates). */
+export const rotateBox = (b: Box): Box => ({ x: 1 - (b.y + b.h), y: b.x, w: b.h, h: b.w });
