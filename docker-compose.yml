@@ -21,7 +21,32 @@ services:
       # In-network addresses win over .env, which may describe a laptop + tunnel.
       DATABASE_URL: postgresql://${PG_USER:-peoples_lpr}:${PG_PASSWORD:?}@postgres:5432/${PG_DB:-peoples_lpr}
       S3_ENDPOINT: http://minio:9000
+      CROP_API_URL: http://plate-crop:8000
     mem_limit: 512m
+    networks:
+      - facefinder
+
+  # Plate detector for auto-crop (crop-service/). Internal only: the web app
+  # calls it over the network; it has no published port.
+  plate-crop:
+    build: ./crop-service
+    image: peoples-lpr-crop:latest
+    container_name: peoples-lpr-crop
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      OMP_NUM_THREADS: "4"
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     networks:
       - facefinder
 

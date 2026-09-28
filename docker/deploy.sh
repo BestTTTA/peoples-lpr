@@ -25,6 +25,9 @@ echo "deploy: current image = ${PREV_IMAGE:-<none>}"
 
 echo "deploy: building $IMAGE"
 docker build -t "$IMAGE" .
+# The plate detector rebuilds from cache unless crop-service/ changed.
+echo "deploy: building plate-crop"
+docker compose build plate-crop
 
 echo "deploy: starting $IMAGE"
 ok=0

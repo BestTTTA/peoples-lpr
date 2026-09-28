@@ -7,3 +7,4 @@ public/maplibre
 .env*
 !.env.example
 *.tsbuildinfo
+crop-service

@@ -49,8 +49,8 @@ laptop reach it over Tailscale with `npm run tunnel` (forwards `localhost:15555`
 | `OCR_API_KEY` | Key for https://ocrapi.roljetson.com (server-side only) |
 | `OCR_API_URL` | OCR API base URL (optional) |
 | `OCR_MAX_BATCH` | Images per upstream OCR request (optional, default 8 — the API's limit) |
-| `CROP_API_URL` | Plate detector for auto-crop (optional, default https://cropmunmun.trafvix.com) |
-| `CROP_CONF` | Detector confidence threshold (optional, default 0.1) |
+| `CROP_API_URL` | Plate detector for auto-crop (default `http://plate-crop:8000`, the compose service) |
+| `CROP_CONF` | Detector confidence threshold (optional, default 0.25) |
 | `DATABASE_URL` | Postgres connection string |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | MinIO |
 
@@ -70,3 +70,19 @@ pointing at `http://localhost:3300`.
   `DEPLOY_SERVER`, `DEPLOY_USER`.
 - The deploy key is restricted on the server to `docker/ci-deploy.sh` (copied to
   `~/bin/peoples-lpr-deploy`), so it can only run `deploy <sha>`.
+
+## Plate detector (auto-crop)
+
+`crop-service/` is a small FastAPI app around the YOLOv8 plate detector
+[Koushim/yolov8-license-plate-detection](https://huggingface.co/Koushim/yolov8-license-plate-detection)
+(MIT). `POST /crops` takes an image and returns plate boxes in pixels; `/api/detect`
+filters them and the browser crops. In production it is the `plate-crop` compose
+service, reachable only from the web container; the image downloads the weights
+from a pinned revision and checks their sha256.
+
+Local dev (needs Python with `ultralytics`, or run the Docker image):
+
+```bash
+MODEL_PATH=path/to/best.pt python -m uvicorn --app-dir crop-service app:app --port 8765
+# and in .env.local: CROP_API_URL=http://127.0.0.1:8765
+```
