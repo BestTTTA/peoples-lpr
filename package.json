@@ -10,7 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "tunnel": "ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 15555:127.0.0.1:5555 sparkle@100.68.248.102"
+    "tunnel": "node scripts/tunnel.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1141.0",

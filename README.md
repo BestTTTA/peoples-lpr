@@ -38,7 +38,7 @@ Tables (`reports`, `plates`) are created automatically on first request (`lib/st
 The bucket is private; images are served through `/api/files/[name]`.
 
 Postgres is bound to loopback on spark and spark has no public inbound address, so from a
-laptop reach it over Tailscale with `npm run tunnel` (forwards `localhost:15555`).
+laptop reach it over Tailscale with `npm run tunnel` (forwards `localhost:15555`, reconnects on drops).
 
 `scripts/import-file-store.mjs` imports the old flat-file store (`data/`) and is safe to re-run.
 
