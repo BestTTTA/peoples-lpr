@@ -25,12 +25,12 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "ป้ายทะเบียนหาย.com",
     locale: "th_TH",
-    title: "น้ำท่วม ป้ายทะเบียนหาย? ตามหาได้ฟรี — ป้ายทะเบียนหาย.com",
+    title: "เจอป้ายทะเบียนรถ? แจ้งพบได้ที่นี่ — ป้ายทะเบียนหาย.com",
     description,
   },
   twitter: {
     card: "summary_large_image",
-    title: "น้ำท่วม ป้ายทะเบียนหาย? ตามหาได้ฟรี — ป้ายทะเบียนหาย.com",
+    title: "เจอป้ายทะเบียนรถ? แจ้งพบได้ที่นี่ — ป้ายทะเบียนหาย.com",
     description,
   },
 };
