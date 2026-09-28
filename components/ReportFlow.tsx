@@ -462,7 +462,7 @@ export default function ReportFlow() {
                   <label className="text-sm font-medium">
                     จังหวัด
                     <ProvinceInput
-                      className={`mt-1 ${lowProvince || !d.province ? "[&_input]:border-warn [&_input]:bg-warn/10" : ""}`}
+                      className={`mt-1 ${lowProvince || !d.province ? "[&_input]:border-warn [&_input]:bg-warn/10 [&_select]:border-warn [&_select]:bg-warn/10" : ""}`}
                       value={d.province}
                       onChange={(v) => editDraft(d.key, { province: v })}
                     />

@@ -1,8 +1,23 @@
 "use client";
-import { useId, useState } from "react";
-import { filterProvinces, isProvince } from "@/lib/provinces";
+import { useId, useState, useSyncExternalStore } from "react";
+import { PROVINCES, filterProvinces, isProvince } from "@/lib/provinces";
 
-/** Free-typing combobox restricted to the 77 provinces. */
+// Touch screens get the native picker: a custom dropdown under a text field can
+// end up behind the on-screen keyboard, and on some phones never shows at all.
+const COARSE = "(pointer: coarse)";
+const subscribe = (cb: () => void) => {
+  const mq = window.matchMedia(COARSE);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+};
+const useTouch = () =>
+  useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(COARSE).matches,
+    () => false,
+  );
+
+/** Province picker restricted to the 77 provinces: native select on touch, typed combobox otherwise. */
 export default function ProvinceInput({
   value,
   onChange,
@@ -19,6 +34,7 @@ export default function ProvinceInput({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const listId = useId();
+  const touch = useTouch();
 
   // Follow external changes (e.g. OCR fills the value in).
   if (value !== synced) {
@@ -26,7 +42,8 @@ export default function ProvinceInput({
     setText(value);
   }
 
-  const options = filterProvinces(text === value ? "" : text).slice(0, 8);
+  // All matches (all 77 when empty); the list scrolls.
+  const options = filterProvinces(text === value ? "" : text);
   const invalid = text !== "" && !isProvince(text);
 
   function pick(p: string) {
@@ -35,6 +52,28 @@ export default function ProvinceInput({
     onChange(p);
     setOpen(false);
   }
+
+  if (touch)
+    return (
+      <div className={className}>
+        <select
+          className={`field ${value ? "" : "text-ink-3"}`}
+          value={value}
+          onChange={(e) => {
+            setText(e.target.value);
+            setSynced(e.target.value);
+            onChange(e.target.value);
+          }}
+        >
+          <option value="">เลือกจังหวัด</option>
+          {PROVINCES.map((p) => (
+            <option key={p} value={p} className="text-ink">
+              {p}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
 
   return (
     <div className={`relative ${className}`}>
@@ -63,12 +102,11 @@ export default function ProvinceInput({
         }}
         onKeyDown={(e) => {
           if (!open || options.length === 0) return;
-          if (e.key === "ArrowDown") {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
             e.preventDefault();
-            setActive((a) => (a + 1) % options.length);
-          } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            setActive((a) => (a - 1 + options.length) % options.length);
+            const next = (active + (e.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
+            setActive(next);
+            document.getElementById(`${listId}-${next}`)?.scrollIntoView({ block: "nearest" });
           } else if (e.key === "Enter") {
             e.preventDefault();
             pick(options[active]);
@@ -84,6 +122,7 @@ export default function ProvinceInput({
           {options.map((p, i) => (
             <li
               key={p}
+              id={`${listId}-${i}`}
               role="option"
               aria-selected={i === active}
               onMouseDown={(e) => {
