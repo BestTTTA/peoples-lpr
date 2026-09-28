@@ -2,14 +2,20 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { REPORT_PATH } from "@/lib/urls";
 
 const TABS = [
   { href: "/", label: "ค้นหาป้ายหาย", short: "ค้นหา" },
-  { href: "/report", label: "แจ้งพบป้าย", short: "แจ้งพบ" },
+  { href: REPORT_PATH, label: "แจ้งพบป้าย", short: "แจ้งพบ" },
 ];
 
 export default function Header() {
-  const path = usePathname();
+  // Thai paths may arrive percent-encoded.
+  const raw = usePathname();
+  let path = raw;
+  try {
+    path = decodeURIComponent(raw);
+  } catch {}
   return (
     <header className="z-20 border-b border-line bg-surface text-white">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5">
@@ -22,7 +28,7 @@ export default function Header() {
         </Link>
         <nav className="ml-auto flex shrink-0 gap-1 rounded-xl bg-white/10 p-1">
           {TABS.map((t) => {
-            const active = t.href === "/" ? path === "/" : path.startsWith(t.href);
+            const active = t.href === "/" ? !path.startsWith(REPORT_PATH) : path.startsWith(t.href);
             return (
               <Link
                 key={t.href}

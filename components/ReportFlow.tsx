@@ -9,6 +9,7 @@ import ProvinceInput from "@/components/ProvinceInput";
 import UploadGuide from "@/components/UploadGuide";
 import { type Box, cropPlate, detectPlates, preparePhoto } from "@/lib/image";
 import { postForm } from "@/lib/post";
+import { reportPath } from "@/lib/urls";
 import { clean, isValidNumber, isValidPrefix, splitPlate } from "@/lib/plate";
 import { isProvince } from "@/lib/provinces";
 import type { OcrResult } from "@/lib/types";
@@ -221,7 +222,7 @@ export default function ReportFlow() {
     try {
       // One attempt only: a retry after a lost response could save the report twice.
       const data = await postForm<{ id: string }>("/api/reports", form, 1);
-      router.push(`/?report=${data.id}&lat=${location.lat}&lng=${location.lng}`);
+      router.push(reportPath(data.id));
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : "บันทึกไม่สำเร็จ");
       setBusy("");

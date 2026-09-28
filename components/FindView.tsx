@@ -9,6 +9,7 @@ import SearchHint from "@/components/SearchHint";
 import { clean, isValidNumber, isValidPrefix } from "@/lib/plate";
 import { RECENCY } from "@/lib/recency";
 import type { PublicReport, SearchHit } from "@/lib/types";
+import { type PlateQuery, href, searchPath } from "@/lib/urls";
 
 type Results = { exact: SearchHit[]; near: SearchHit[] };
 
@@ -22,35 +23,34 @@ function FunnelIcon() {
   );
 }
 
-export default function FindView({ initialFocus }: { initialFocus: Focus | null }) {
+type InitialReport = { reportId: string; at: { lat: number; lng: number } | null };
+
+export default function FindView({
+  initialReport,
+  initialSearch,
+}: {
+  /** From /จุดพบ/<id> (or the post-submit redirect): focus that report. */
+  initialReport: InitialReport | null;
+  /** From /ค้นหา/<plate>: fill the form in and search straight away. */
+  initialSearch: PlateQuery | null;
+}) {
   const [reports, setReports] = useState<PublicReport[]>([]);
   const [focus, setFocus] = useState<Focus | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterProvince, setFilterProvince] = useState("");
-  const [prefix, setPrefix] = useState("");
-  const [number, setNumber] = useState("");
-  const [province, setProvince] = useState("");
+  const [prefix, setPrefix] = useState(initialSearch?.prefix ?? "");
+  const [number, setNumber] = useState(initialSearch?.number ?? "");
+  const [province, setProvince] = useState(initialSearch?.province ?? "");
   const [touched, setTouched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [results, setResults] = useState<Results | null>(null);
+  /** The popup announcing a search outcome; closed by the finder. */
+  const [popup, setPopup] = useState<(Results & { query: PlateQuery }) | null>(null);
   const cardRefs = useRef(new Map<string, HTMLElement>());
 
-  useEffect(() => {
-    fetch("/api/reports")
-      .then((r) => r.json())
-      .then((data: PublicReport[]) => {
-        setReports(data);
-        // Coming back from a new report: show it once the data is in.
-        if (initialFocus) {
-          setFocus(initialFocus);
-          setSelected(initialFocus.reportIds[0] ?? null);
-        }
-      })
-      .catch(() => setError("โหลดข้อมูลแผนที่ไม่สำเร็จ"));
-  }, [initialFocus]);
 
   const visible = useMemo(
     () =>
@@ -76,18 +76,25 @@ export default function FindView({ initialFocus }: { initialFocus: Focus | null 
     }
   }
 
-  async function search(e: React.FormEvent) {
+  function search(e: React.FormEvent) {
     e.preventDefault();
     setTouched(true);
     if (!prefixOk || !numberOk || !provinceOk) return;
+    runSearch({ prefix: clean(prefix), number: clean(number), province });
+  }
+
+  async function runSearch(p: PlateQuery) {
     setLoading(true);
     setError("");
+    // The address bar shows the search, so it can be shared or bookmarked.
+    window.history.replaceState(null, "", href(searchPath(p.prefix, p.number, p.province)));
     try {
-      const q = new URLSearchParams({ prefix: clean(prefix), number: clean(number), province });
+      const q = new URLSearchParams(p);
       const res = await fetch(`/api/search?${q}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setResults(data);
+      setPopup({ ...data, query: p });
       const hits = data.exact as SearchHit[];
       if (hits[0]) {
         setSelected(hits[0].report.id);
@@ -99,6 +106,32 @@ export default function FindView({ initialFocus }: { initialFocus: Focus | null 
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    fetch("/api/reports")
+      .then((r) => r.json())
+      .then((data: PublicReport[]) => {
+        setReports(data);
+        // A report link: show it once the data is in.
+        if (initialReport) {
+          const r = data.find((x) => x.id === initialReport.reportId);
+          const at = r ? { lat: r.lat, lng: r.lng } : initialReport.at;
+          if (at) {
+            setFocus({ ...at, reportIds: [initialReport.reportId] });
+            setSelected(initialReport.reportId);
+          }
+        }
+        if (initialSearch) runSearch(initialSearch);
+      })
+      .catch(() => setError("โหลดข้อมูลแผนที่ไม่สำเร็จ"));
+    // Only on first load; later searches go through the form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const showFromPopup = (h: SearchHit) => {
+    setPopup(null);
+    showHit(h);
+  };
 
   const showHit = (h: SearchHit) => {
     setSelected(h.report.id);
@@ -293,6 +326,112 @@ export default function FindView({ initialFocus }: { initialFocus: Focus | null 
           </aside>
         </>
       )}
+
+      {popup && (
+        <SearchPopup
+          result={popup}
+          onClose={() => setPopup(null)}
+          onShow={showFromPopup}
+          onShowNear={() => {
+            setPopup(null);
+            setPanelOpen(true);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Announces a search outcome: found (with where to collect it) or not yet. */
+function SearchPopup({
+  result,
+  onClose,
+  onShow,
+  onShowNear,
+}: {
+  result: Results & { query: PlateQuery };
+  onClose: () => void;
+  onShow: (h: SearchHit) => void;
+  onShowNear: () => void;
+}) {
+  const { exact, near, query } = result;
+  const found = exact.length > 0;
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+    } catch {}
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="search-popup-title"
+        className="card flex max-h-[85vh] w-full max-w-md flex-col gap-3 overflow-y-auto p-4"
+      >
+        <div className="flex items-start gap-3">
+          <div className="text-4xl leading-none">{found ? "🎉" : "🔍"}</div>
+          <div className="min-w-0 flex-1">
+            <h2 id="search-popup-title" className={`text-lg font-bold ${found ? "text-emerald-400" : ""}`}>
+              {found ? "เจอแล้ว! มีคนพบป้ายของคุณ" : "ยังไม่มีข้อมูลป้ายทะเบียนนี้"}
+            </h2>
+            <p className="text-sm text-ink-3">
+              {found
+                ? exact.length > 1
+                  ? `พบ ${exact.length} รายการ ดูจุดรับคืนและช่องทางติดต่อด้านล่าง`
+                  : "ดูจุดรับคืนและช่องทางติดต่อด้านล่าง"
+                : "ยังไม่มีผู้แจ้งพบป้ายนี้ในระบบ"}
+            </p>
+          </div>
+          <button type="button" className="icon-btn shrink-0" aria-label="ปิด" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+
+        {!found && (
+          <div className="self-center">
+            <PlateBadge prefix={query.prefix} number={query.number} province={query.province} size="sm" />
+          </div>
+        )}
+
+        {found ? (
+          exact.map((h) => <HitCard key={h.plate.id} hit={h} active={false} onShow={() => onShow(h)} />)
+        ) : (
+          <>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-ink-3">
+              <li>ตรวจหมวดอักษร เลขทะเบียน และจังหวัดอีกครั้ง</li>
+              <li>มีผู้แจ้งพบป้ายเพิ่มขึ้นทุกวัน กลับมาค้นหาใหม่ได้ภายหลัง</li>
+            </ul>
+            <div className="flex flex-wrap gap-2">
+              {near.length > 0 && (
+                <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={onShowNear}>
+                  ดูป้ายที่ใกล้เคียง ({near.length})
+                </button>
+              )}
+              <button type="button" className="btn-ghost px-3 py-1.5 text-sm" onClick={copyLink}>
+                {copied ? "✓ คัดลอกลิงก์แล้ว" : "🔗 คัดลอกลิงก์ไว้ค้นหาอีกครั้ง"}
+              </button>
+            </div>
+          </>
+        )}
+
+        <button type="button" className="btn-ghost" onClick={onClose}>
+          {found ? "ปิด" : "ค้นหาป้ายอื่น"}
+        </button>
+      </div>
     </div>
   );
 }
