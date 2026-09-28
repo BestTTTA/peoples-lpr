@@ -16,8 +16,8 @@ export default function Header() {
         <Link href="/" className="flex min-w-0 items-center gap-2.5">
           <Image src="/peoples-lpr-logo.png" alt="" width={40} height={40} className="rounded-full" priority />
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-lg font-bold tracking-tight">Peoples LPR</div>
-            <div className="truncate text-[11px] text-white/60">ตามหาป้ายทะเบียนที่หาย</div>
+            <div className="truncate text-lg font-bold tracking-tight">ตามหาป้ายทะเบียนหาย</div>
+            <div className="truncate text-[11px] text-white/60">ป้ายทะเบียนหาย.com · Peoples LPR</div>
           </div>
         </Link>
         <nav className="ml-auto flex shrink-0 gap-1 rounded-xl bg-white/10 p-1">

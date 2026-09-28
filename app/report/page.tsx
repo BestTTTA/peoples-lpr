@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import ReportFlow from "@/components/ReportFlow";
 
 export const metadata: Metadata = {
-  title: "แจ้งพบป้ายทะเบียน — Peoples LPR",
+  title: "แจ้งพบป้ายทะเบียน — ป้ายทะเบียนหาย.com",
 };
 
 export default function ReportPage() {

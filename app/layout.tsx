@@ -10,26 +10,27 @@ const plex = IBM_Plex_Sans_Thai({
 });
 
 const description =
-  "Peoples LPR powered by Solutionmania: แจ้งพบและค้นหาป้ายทะเบียนรถที่หาย พร้อมตำแหน่งบนแผนที่";
+  "ป้ายทะเบียนหาย.com (Peoples LPR): แจ้งพบและค้นหาป้ายทะเบียนรถที่หาย พร้อมตำแหน่งบนแผนที่";
 
 export const metadata: Metadata = {
   // Share previews need absolute image URLs; the image itself is app/opengraph-image.jpg.
-  metadataBase: new URL(process.env.SITE_URL ?? "https://peoples-lpr.roljetson.com"),
-  title: "Peoples LPR — ตามหาป้ายทะเบียนหาย",
+  // The host is ป้ายทะเบียนหาย.com in punycode, which every crawler understands.
+  metadataBase: new URL(process.env.SITE_URL ?? "https://xn--o3cecc9acb5exbrh6a5k3e.com"),
+  title: "ตามหาป้ายทะเบียนหาย — ป้ายทะเบียนหาย.com",
   description,
-  applicationName: "Peoples LPR",
+  applicationName: "ป้ายทะเบียนหาย.com",
   authors: [{ name: "Thetigerteam Foundation Technology" }],
   creator: "Thetigerteam Foundation Technology",
   openGraph: {
     type: "website",
-    siteName: "Peoples LPR",
+    siteName: "ป้ายทะเบียนหาย.com",
     locale: "th_TH",
-    title: "น้ำท่วม ป้ายทะเบียนหาย? ตามหาได้ฟรี — Peoples LPR",
+    title: "น้ำท่วม ป้ายทะเบียนหาย? ตามหาได้ฟรี — ป้ายทะเบียนหาย.com",
     description,
   },
   twitter: {
     card: "summary_large_image",
-    title: "น้ำท่วม ป้ายทะเบียนหาย? ตามหาได้ฟรี — Peoples LPR",
+    title: "น้ำท่วม ป้ายทะเบียนหาย? ตามหาได้ฟรี — ป้ายทะเบียนหาย.com",
     description,
   },
 };
