@@ -1,6 +1,7 @@
 """Plate detector for auto-crop (YOLO, ultralytics).
 
-    POST /crops   multipart: file (image), model, conf, iou, imgsz (all but file optional)
+    POST /crops   multipart: file (image), model, conf, iou, imgsz, tile, overlap,
+                  aspect_min, aspect_max (all but file optional)
       -> {"count": n, "model": id, "crops": [{"box": [x1, y1, x2, y2], "conf": 0.87,
                                               "class_id": 0, "class_name": "license_plate"}]}
     GET  /health
@@ -37,6 +38,8 @@ from io import BytesIO
 from pathlib import Path
 
 import numpy as np
+import torch
+import torchvision
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from PIL import Image, ImageOps, UnidentifiedImageError
 from ultralytics import YOLO
@@ -109,6 +112,42 @@ async def _lifespan(_app: FastAPI):
 app = FastAPI(title="Plate crop service", lifespan=_lifespan)
 
 
+def _tiles(w: int, h: int, size: int, overlap: float) -> list[tuple[int, int, int, int]]:
+    """Overlapping size x size windows covering the image, the last row/column flush with the edge."""
+    step = max(1, int(size * (1 - overlap)))
+
+    def starts(n: int) -> list[int]:
+        s = list(range(0, max(1, n - size) + 1, step))
+        if s[-1] + size < n:
+            s.append(n - size)
+        return s
+
+    return [(x, y, min(w, x + size), min(h, y + size)) for y in starts(h) for x in starts(w)]
+
+
+def _merge(boxes: list[tuple], iou: float, shaped) -> list[tuple]:
+    """NMS across tiles, then drop boxes mostly inside a bigger plate-shaped one (plates cut by a tile)."""
+    if not boxes:
+        return []
+    t = torch.tensor([b[:4] for b in boxes], dtype=torch.float32)
+    keep = torchvision.ops.nms(t, torch.tensor([b[4] for b in boxes]), iou).tolist()
+    kept = [boxes[i] for i in keep]
+    area = lambda b: (b[2] - b[0]) * (b[3] - b[1])  # noqa: E731
+    out = []
+    for a in kept:
+        inside = False
+        for b in kept:
+            if b is a or area(b) <= area(a) or not shaped(b):
+                continue
+            ix = max(0, min(a[2], b[2]) - max(a[0], b[0])) * max(0, min(a[3], b[3]) - max(a[1], b[1]))
+            if ix > 0.7 * area(a):
+                inside = True
+                break
+        if not inside:
+            out.append(a)
+    return out
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "loaded": list(_loaded)}
@@ -121,6 +160,10 @@ async def crops(
     conf: float = Form(DEFAULT_CONF),
     iou: float = Form(DEFAULT_IOU),
     imgsz: int = Form(DEFAULT_IMGSZ),
+    tile: int = Form(0),
+    overlap: float = Form(0.3),
+    aspect_min: float = Form(1.1),
+    aspect_max: float = Form(3.6),
 ):
     data = await file.read()
     if not data or len(data) > MAX_IMAGE_BYTES:
@@ -132,29 +175,52 @@ async def crops(
         raise HTTPException(400, "not an image")
 
     model_id = model
-    model = _model(model_id)
+    yolo = _model(model_id)
     frame = np.asarray(img)[:, :, ::-1]  # ultralytics takes numpy images as BGR
-    result = model.predict(
-        frame,
-        conf=min(max(conf, 0.01), 0.99),
-        iou=min(max(iou, 0.05), 0.95),
-        imgsz=min(max(imgsz // 32 * 32, 320), 1280),
-        verbose=False,
-    )[0]
+    h, w = frame.shape[:2]
+    conf = min(max(conf, 0.01), 0.99)
+    iou = min(max(iou, 0.05), 0.95)
+    imgsz = min(max(imgsz // 32 * 32, 320), 1280)
+    overlap = min(max(overlap, 0.05), 0.6)
+
+    # Whole image first (big plates), then, for images larger than one tile,
+    # overlapping tiles: the model sees each at full resolution instead of the
+    # whole photo squeezed to imgsz, which is what loses small plates (many
+    # plates on a table, portrait photos).
+    windows = [(0, 0, w, h)]
+    if tile >= 320 and max(w, h) > tile * 1.15:
+        windows += _tiles(w, h, tile, overlap)
+    crops = [frame[y1:y2, x1:x2] for x1, y1, x2, y2 in windows]
+    results = yolo.predict(crops, conf=conf, iou=iou, imgsz=imgsz, verbose=False)
+
+    boxes = []
+    for (wx1, wy1, wx2, wy2), r in zip(windows, results):
+        whole = (wx1, wy1, wx2, wy2) == (0, 0, w, h)
+        for (x1, y1, x2, y2), score, cls in zip(r.boxes.xyxy.tolist(), r.boxes.conf.tolist(), r.boxes.cls.tolist()):
+            # A box touching an inner tile edge is a cut plate; a neighbouring tile has it whole.
+            if not whole and (
+                (x1 <= 2 and wx1 > 0) or (y1 <= 2 and wy1 > 0) or (x2 >= wx2 - wx1 - 2 and wx2 < w) or (y2 >= wy2 - wy1 - 2 and wy2 < h)
+            ):
+                continue
+            boxes.append((x1 + wx1, y1 + wy1, x2 + wx1, y2 + wy1, score, int(cls)))
+
+    def shaped(b) -> bool:
+        return aspect_min <= (b[2] - b[0]) / max(1.0, b[3] - b[1]) <= aspect_max
+
+    if len(windows) > 1:
+        boxes = _merge(boxes, 0.5, shaped)
 
     out = [
         {
             "box": [round(x1), round(y1), round(x2), round(y2)],
             "conf": round(score, 4),
-            "class_id": int(cls),
-            "class_name": model.names[int(cls)],
+            "class_id": cls,
+            "class_name": yolo.names[cls],
         }
-        for (x1, y1, x2, y2), score, cls in zip(
-            result.boxes.xyxy.tolist(), result.boxes.conf.tolist(), result.boxes.cls.tolist()
-        )
+        for x1, y1, x2, y2, score, cls in boxes
     ]
     out.sort(key=lambda c: c["conf"], reverse=True)
-    return {"count": len(out), "model": model_id, "crops": out}
+    return {"count": len(out), "model": model_id, "tiles": len(windows) - 1, "crops": out}
 
 
 @app.get("/models")

@@ -10,6 +10,10 @@ export type DetectSettings = {
   /** Plate-shaped boxes only: width / height within [aspectMin, aspectMax]. */
   aspectMin: number;
   aspectMax: number;
+  /** Tiled inference: window size in px, 0 = off. */
+  tileSize: number;
+  /** How much neighbouring tiles overlap (fraction). */
+  tileOverlap: number;
 };
 
 export const DETECT_LIMITS: Record<keyof DetectSettings, { min: number; max: number; step: number; label: string; hint: string }> = {
@@ -18,6 +22,8 @@ export const DETECT_LIMITS: Record<keyof DetectSettings, { min: number; max: num
   imgsz: { min: 320, max: 1280, step: 32, label: "ขนาดภาพเข้าโมเดล (imgsz)", hint: "ใช้ค่าที่โมเดล train มา (ส่วนใหญ่ 640) · ใหญ่ขึ้นช้าลง" },
   aspectMin: { min: 0.5, max: 3, step: 0.1, label: "สัดส่วนกรอบต่ำสุด (กว้าง÷สูง)", hint: "ตัดกรอบที่แคบ/สูงเกินกว่าจะเป็นป้าย" },
   aspectMax: { min: 1.5, max: 8, step: 0.1, label: "สัดส่วนกรอบสูงสุด (กว้าง÷สูง)", hint: "ตัดกรอบที่กว้างเกิน เช่นกรอบคร่อมป้ายทั้งแถว · ป้ายไทยจริงถึง ~3.4" },
+  tileSize: { min: 0, max: 1280, step: 32, label: "แบ่งภาพเป็นชิ้น (tiling) ขนาดชิ้น px", hint: "0 = ปิด · แบ่งรูปเป็นชิ้นซ้อนกันแล้วหาป้ายทีละชิ้น ช่วยมากกับรูปแนวตั้ง/รูปที่มีป้ายเยอะ (ทดสอบ: เจอเพิ่ม 2 เท่า) · ช้าลงตามจำนวนชิ้น" },
+  tileOverlap: { min: 0.1, max: 0.5, step: 0.05, label: "ชิ้นซ้อนกัน (overlap)", hint: "ควรกว้างกว่าป้าย 1 ป้ายในรูป เพื่อให้ป้ายที่ถูกตัดขอบชิ้นเห็นเต็มในชิ้นข้าง ๆ" },
 };
 
 export const DETECT_KEYS = Object.keys(DETECT_LIMITS) as (keyof DetectSettings)[];
@@ -31,7 +37,9 @@ export function sanitizeDetect(input: unknown): DetectSettings | null {
     if (!Number.isFinite(v)) return null;
     const { min, max, step } = DETECT_LIMITS[k];
     const clamped = Math.min(max, Math.max(min, v));
-    out[k] = k === "imgsz" ? Math.round(clamped / step) * step : Math.round(clamped * 1000) / 1000;
+    out[k] = k === "imgsz" || k === "tileSize" ? Math.round(clamped / step) * step : Math.round(clamped * 1000) / 1000;
+    // Tiles smaller than the model input make no sense: treat as off.
+    if (k === "tileSize" && out[k] < 320) out[k] = 0;
   }
   if (out.aspectMin >= out.aspectMax) return null;
   return out;

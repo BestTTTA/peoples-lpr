@@ -16,7 +16,13 @@ import { isProvince } from "@/lib/provinces";
 import type { OcrResult } from "@/lib/types";
 
 /** AI detection state of a photo; undefined = not asked (manual mode). */
-type Scan = "busy" | "found" | "none" | "fail";
+type Scan = "busy" | "found" | "whole" | "none" | "fail";
+
+/** A photo this shape is already a close-up of one plate (detectors miss those). */
+const plateShapedPhoto = (p: { width: number; height: number }) => {
+  const r = p.width / p.height;
+  return r >= 1.6 && r <= 5;
+};
 
 type Photo = { id: string; blob: Blob; url: string; width: number; height: number; boxes: Box[]; scan?: Scan };
 
@@ -71,13 +77,14 @@ export default function ReportFlow() {
   async function scan(p: Photo) {
     patchPhoto(p.id, { scan: "busy" });
     try {
-      const found = await detectPlates(p);
+      let found = await detectPlates(p);
+      let scan: Scan = found.length ? "found" : "none";
+      if (!found.length && plateShapedPhoto(p)) {
+        found = [{ x: 0, y: 0, w: 1, h: 1 }];
+        scan = "whole";
+      }
       setPhotos((prev) =>
-        prev.map((q) =>
-          q.id !== p.id
-            ? q
-            : { ...q, scan: found.length ? "found" : "none", boxes: q.boxes.length ? q.boxes : found },
-        ),
+        prev.map((q) => (q.id !== p.id ? q : { ...q, scan, boxes: q.boxes.length ? q.boxes : found })),
       );
     } catch {
       patchPhoto(p.id, { scan: "fail" });
@@ -364,7 +371,9 @@ export default function ReportFlow() {
                     ? "✍️ ลากครอบป้ายทีละป้ายบนรูป"
                     : current?.scan === "busy"
                       ? "🤖 AI กำลังหาป้ายในรูปนี้…"
-                      : current?.scan === "none"
+                      : current?.scan === "whole"
+                        ? "🤖 รูปนี้เป็นป้ายเดียวเต็มรูป — ใช้ทั้งรูปเป็น 1 ป้าย (แก้กรอบได้)"
+                        : current?.scan === "none"
                         ? "🤖 AI หาป้ายไม่เจอ — ลากครอบเองได้"
                         : current?.scan === "fail"
                           ? "🤖 AI ใช้งานไม่ได้ตอนนี้ — ลากครอบเองได้"

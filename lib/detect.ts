@@ -10,6 +10,10 @@ async function runModel(file: Blob, model: string, s: DetectSettings): Promise<C
   form.append("conf", String(s.conf));
   form.append("iou", String(s.iou));
   form.append("imgsz", String(s.imgsz));
+  form.append("tile", String(s.tileSize));
+  form.append("overlap", String(s.tileOverlap));
+  form.append("aspect_min", String(s.aspectMin));
+  form.append("aspect_max", String(s.aspectMax));
   try {
     const res = await cropFetch("/crops", { method: "POST", body: form, signal: AbortSignal.timeout(30_000) });
     const data = (await res.json().catch(() => ({}))) as { crops?: { box?: number[]; conf?: number }[] };
