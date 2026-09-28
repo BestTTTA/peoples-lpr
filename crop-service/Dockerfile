@@ -20,8 +20,9 @@ ADD --checksum=sha256:2d95861825bb4184404344c9cf809f40fd31dba785fe54e8ba5b9a3583
     /models/best.pt
 
 COPY app.py .
-ENV MODEL_PATH=/models/best.pt YOLO_CONFIG_DIR=/tmp/Ultralytics PYTHONUNBUFFERED=1
-RUN useradd --create-home app && chmod 644 /models/best.pt
+ENV MODEL_PATH=/models/best.pt DATA_DIR=/data YOLO_CONFIG_DIR=/tmp/Ultralytics PYTHONUNBUFFERED=1
+# /data is a volume (uploaded models); created here so it is owned by app.
+RUN useradd --create-home app && chmod 644 /models/best.pt && mkdir -p /data/models && chown -R app /data
 USER app
 EXPOSE 8000
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

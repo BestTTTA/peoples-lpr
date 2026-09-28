@@ -86,3 +86,20 @@ Local dev (needs Python with `ultralytics`, or run the Docker image):
 MODEL_PATH=path/to/best.pt python -m uvicorn --app-dir crop-service app:app --port 8765
 # and in .env.local: CROP_API_URL=http://127.0.0.1:8765
 ```
+
+## Admin page (`/admin`)
+
+Sign in with `ADMIN_PASSWORD` (server `.env`, at least 8 characters). The page
+is not linked from the site and is excluded from robots.
+
+- **Detector settings**: confidence, NMS IOU, input size, plate-shape filter.
+  Saved in Postgres (`settings` table) and used by `/api/detect` within ~10 s.
+  Env (`CROP_CONF`, `CROP_IOU`, `CROP_IMGSZ`) only supplies the defaults.
+- **Test**: upload a photo and see every model's boxes with the unsaved settings.
+- **Models**: upload YOLO `.pt` detect models (≤ 95 MB, validated by loading
+  them), choose the primary model, or turn on **compare** mode: each photo
+  goes to two models and the answer with more plate-shaped boxes is used (ties:
+  higher mean confidence). Uploads live in the crop service's `crop-data`
+  volume; the web app reaches its model API with `CROP_ADMIN_TOKEN`.
+
+A `.pt` file runs code when loaded, so only upload models from trusted sources.

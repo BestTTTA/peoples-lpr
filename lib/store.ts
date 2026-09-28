@@ -12,8 +12,9 @@ function env(name: string): string {
   return v;
 }
 
-// One pool per server process; survive dev hot reloads.
-const g = globalThis as unknown as { lprPool?: Pool; lprS3?: S3Client; lprSchema?: Promise<void> };
+// One pool per server process; survive dev hot reloads. (Bump the schema key
+// when ready() gains tables, so a running dev server runs it again.)
+const g = globalThis as unknown as { lprPool?: Pool; lprS3?: S3Client; lprSchemaV2?: Promise<void> };
 
 function pool(): Pool {
   g.lprPool ??= new Pool({ connectionString: env("DATABASE_URL"), max: 5 });
@@ -34,7 +35,7 @@ const bucket = () => env("S3_BUCKET");
 
 /** Idempotent schema setup, run once per process before the first query. */
 function ready(): Promise<void> {
-  g.lprSchema ??= pool()
+  g.lprSchemaV2 ??= pool()
     .query(
       `CREATE TABLE IF NOT EXISTS reports (
          id          uuid PRIMARY KEY,
@@ -57,14 +58,19 @@ function ready(): Promise<void> {
          photo      int  NOT NULL
        );
        CREATE INDEX IF NOT EXISTS plates_report_idx ON plates (report_id);
-       CREATE INDEX IF NOT EXISTS plates_lookup_idx ON plates (province, prefix, number);`,
+       CREATE INDEX IF NOT EXISTS plates_lookup_idx ON plates (province, prefix, number);
+       CREATE TABLE IF NOT EXISTS settings (
+         key         text PRIMARY KEY,
+         value       jsonb NOT NULL,
+         updated_at  timestamptz NOT NULL DEFAULT now()
+       );`,
     )
     .then(() => undefined)
     .catch((err) => {
-      g.lprSchema = undefined; // retry on the next request
+      g.lprSchemaV2 = undefined; // retry on the next request
       throw err;
     });
-  return g.lprSchema;
+  return g.lprSchemaV2;
 }
 
 type Row = {
@@ -150,4 +156,20 @@ export async function getFile(name: string): Promise<Uint8Array | null> {
     if (err instanceof NoSuchKey) return null;
     throw err;
   }
+}
+
+/** A saved setting (admin page), or null if never set. */
+export async function getSetting<T>(key: string): Promise<T | null> {
+  await ready();
+  const { rows } = await pool().query<{ value: T }>("SELECT value FROM settings WHERE key = $1", [key]);
+  return rows[0]?.value ?? null;
+}
+
+export async function setSetting(key: string, value: unknown): Promise<void> {
+  await ready();
+  await pool().query(
+    `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, now())
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+    [key, JSON.stringify(value)],
+  );
 }

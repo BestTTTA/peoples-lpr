@@ -30,7 +30,7 @@ export default function Header() {
         <nav className="ml-auto flex shrink-0 gap-1 rounded-xl bg-white/10 p-1">
           {TABS.map((t) => {
             const active =
-              t.href === "/" ? !TABS.some((o) => o.href !== "/" && path.startsWith(o.href)) : path.startsWith(t.href);
+              t.href === "/" ? path === "/" || /^\/(ค้นหา|จุดพบ)\//.test(path) : path.startsWith(t.href);
             return (
               <Link
                 key={t.href}

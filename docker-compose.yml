@@ -22,7 +22,8 @@ services:
       DATABASE_URL: postgresql://${PG_USER:-peoples_lpr}:${PG_PASSWORD:?}@postgres:5432/${PG_DB:-peoples_lpr}
       S3_ENDPOINT: http://minio:9000
       CROP_API_URL: http://plate-crop:8000
-    mem_limit: 512m
+    # Model uploads pass through in memory (up to 95 MB).
+    mem_limit: 768m
     networks:
       - facefinder
 
@@ -40,6 +41,10 @@ services:
         max-file: "3"
     environment:
       OMP_NUM_THREADS: "4"
+      # Shared with the web app (from .env); enables model upload/switching.
+      ADMIN_TOKEN: ${CROP_ADMIN_TOKEN:-}
+    volumes:
+      - crop-data:/data
     mem_limit: 2g
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -49,6 +54,9 @@ services:
       start_period: 60s
     networks:
       - facefinder
+
+volumes:
+  crop-data:
 
 networks:
   facefinder:
