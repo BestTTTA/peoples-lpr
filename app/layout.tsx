@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_Thai } from "next/font/google";
 import Header from "@/components/Header";
+import WatchAlert from "@/components/WatchAlert";
 import "./globals.css";
 
 const plex = IBM_Plex_Sans_Thai({
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex h-full flex-col">
         <Header />
         <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+        <WatchAlert />
       </body>
     </html>
   );

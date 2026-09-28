@@ -4,13 +4,15 @@ import DevCredit from "@/components/DevCredit";
 import FoundMap, { type Focus } from "@/components/FoundMap";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
-import ReportCard, { RecencyBadge, timeAgo } from "@/components/ReportCard";
+import HitCard from "@/components/HitCard";
+import ReportCard, { timeAgo } from "@/components/ReportCard";
 import SearchHint from "@/components/SearchHint";
 import { clean, isValidNumber, isValidPrefix } from "@/lib/plate";
 import { RECENCY } from "@/lib/recency";
 import { toSpots } from "@/lib/spots";
 import type { PublicReport, SearchHit } from "@/lib/types";
 import { type PlateQuery, href, searchPath } from "@/lib/urls";
+import { addWatch, removeWatch, useWatches } from "@/lib/watches";
 
 type Results = { exact: SearchHit[]; near: SearchHit[] };
 
@@ -260,6 +262,8 @@ export default function FindView({
               {error && <p className="text-sm text-red-400">{error}</p>}
             </form>
 
+            <WatchList onPick={runSearch} />
+
             {results ? (
               <section className="flex flex-col gap-2">
                 <button
@@ -368,6 +372,11 @@ function SearchPopup({
   const { exact, near, query } = result;
   const found = exact.length > 0;
   const [copied, setCopied] = useState(false);
+  const [watchError, setWatchError] = useState(false);
+  const watches = useWatches();
+  const watched = watches.some(
+    (w) => w.prefix === query.prefix && w.number === query.number && w.province === query.province,
+  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -424,8 +433,24 @@ function SearchPopup({
           <>
             <ul className="list-disc space-y-1 pl-5 text-sm text-ink-3">
               <li>ตรวจหมวดอักษร เลขทะเบียน และจังหวัดอีกครั้ง</li>
-              <li>มีผู้แจ้งพบป้ายเพิ่มขึ้นทุกวัน กลับมาค้นหาใหม่ได้ภายหลัง</li>
+              <li>มีผู้แจ้งพบป้ายเพิ่มขึ้นทุกวัน กดฝากตามหาไว้ แล้วเราจะเตือนเมื่อกลับมาเปิดเว็บนี้</li>
             </ul>
+            {watched ? (
+              <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
+                🔔 ฝากตามหาแล้ว — เมื่อมีคนแจ้งพบป้ายนี้ จะมีแจ้งเตือนตอนคุณกลับมาเปิดเว็บ (ในเครื่องและเบราว์เซอร์นี้)
+              </p>
+            ) : (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => (addWatch(query) ? null : setWatchError(true))}
+              >
+                🔔 ฝากตามหาป้ายนี้
+              </button>
+            )}
+            {watchError && (
+              <p className="text-sm text-warn">เบราว์เซอร์นี้ไม่อนุญาตให้บันทึก (อาจเป็นโหมดไม่ระบุตัวตน) — ใช้ลิงก์ด้านล่างแทน</p>
+            )}
             <div className="flex flex-wrap gap-2">
               {near.length > 0 && (
                 <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={onShowNear}>
@@ -447,61 +472,26 @@ function SearchPopup({
   );
 }
 
-function HitCard({ hit, active, onShow }: { hit: SearchHit; active: boolean; onShow: () => void }) {
-  const { plate, report } = hit;
-  const photo = report.photos[plate.photo];
+/** Plates this browser asked us to keep looking for, with a way to drop them. */
+function WatchList({ onPick }: { onPick: (q: PlateQuery) => void }) {
+  const watches = useWatches();
+  if (watches.length === 0) return null;
   return (
-    <article className={`flex flex-col gap-2 rounded-lg p-2 transition ${active ? "bg-surface-2" : ""}`}>
-      <button type="button" onClick={onShow} className="flex items-center gap-3 text-left">
-        <span className="relative shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element -- user uploads served from our API */}
-          <img
-            src={`/api/files/${plate.crop}`}
-            alt="รูปป้ายที่พบ"
-            className="h-[70px] w-[96px] rounded-[3px] bg-black object-contain"
-          />
-          <RecencyBadge createdAt={report.createdAt} />
-        </span>
-        <span className="min-w-0 flex-1">
-          <PlateBadge prefix={plate.prefix} number={plate.number} province={plate.province} size="sm" />
-          <span className="mt-1 line-clamp-2 text-sm text-ink-3">
-            {report.place || `${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}`}
-          </span>
-          <span className="block text-xs text-ink-3/80">พบ {timeAgo(report.createdAt)}</span>
-        </span>
-      </button>
-      {(report.note || report.contact) && (
-        <div className="rounded-lg border border-line px-3 py-2 text-sm">
-          {report.note && (
-            <p>
-              <span className="text-ink-3">จุดรับคืน:</span> {report.note}
-            </p>
-          )}
-          {report.contact && (
-            <p>
-              <span className="text-ink-3">ติดต่อ:</span> {report.contact}
-            </p>
-          )}
-        </div>
-      )}
-      <div className="flex flex-wrap gap-2">
-        <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={onShow}>
-          📍 ดูบนแผนที่
-        </button>
-        <a
-          className="btn-ghost px-3 py-1.5 text-sm"
-          href={`https://www.google.com/maps/dir/?api=1&destination=${report.lat},${report.lng}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          นำทาง
-        </a>
-        {photo && (
-          <a className="btn-ghost px-3 py-1.5 text-sm" href={`/api/files/${photo}`} target="_blank" rel="noreferrer">
-            รูปเต็ม
-          </a>
-        )}
-      </div>
-    </article>
+    <section className="rounded-2xl border border-line p-3">
+      <h3 className="mb-2 text-sm font-semibold">🔔 ป้ายที่ฝากตามหา ({watches.length})</h3>
+      <ul className="flex flex-col gap-2">
+        {watches.map((w) => (
+          <li key={`${w.prefix}${w.number}${w.province}`} className="flex items-center gap-2">
+            <button type="button" onClick={() => onPick(w)} title="ค้นหาอีกครั้ง">
+              <PlateBadge prefix={w.prefix} number={w.number} province={w.province} size="sm" />
+            </button>
+            <span className="flex-1 text-xs text-ink-3">ฝากไว้ {timeAgo(w.since)}</span>
+            <button type="button" className="text-xs text-ink-3 hover:text-red-400" onClick={() => removeWatch(w)}>
+              เลิกตามหา
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
