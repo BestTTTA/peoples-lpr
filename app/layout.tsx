@@ -24,12 +24,12 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "Peoples LPR",
     locale: "th_TH",
-    title: "ช่วยตามหาป้ายทะเบียน — Peoples LPR",
+    title: "น้ำท่วม ป้ายทะเบียนหาย? ตามหาได้ฟรี — Peoples LPR",
     description,
   },
   twitter: {
     card: "summary_large_image",
-    title: "ช่วยตามหาป้ายทะเบียน — Peoples LPR",
+    title: "น้ำท่วม ป้ายทะเบียนหาย? ตามหาได้ฟรี — Peoples LPR",
     description,
   },
 };
