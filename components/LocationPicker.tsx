@@ -61,8 +61,10 @@ export default function LocationPicker({
     marker.current.setLngLat([value.lng, value.lat]).addTo(map);
   }, [map, value]);
 
-  async function search() {
-    const q = query.trim();
+  async function search(text = query) {
+    const q = text.trim();
+    // A pasted Google Maps link or coordinates names one spot: pin it straight away.
+    const direct = /^https?:\/\//i.test(q) || /^-?\d{1,2}\.\d+\s*[,/ ]\s*-?\d{1,3}\.\d+$/.test(q);
     if (q.length < 2) return setSearchError("พิมพ์ชื่อสถานที่อย่างน้อย 2 ตัวอักษร");
     setSearching(true);
     setSearchError("");
@@ -76,7 +78,8 @@ export default function LocationPicker({
       const res = await fetch(`/api/places?${params}`);
       const data = await res.json().catch(() => ({ error: "ค้นหาสถานที่ไม่สำเร็จ ลองใหม่อีกครั้ง" }));
       if (!res.ok) throw new Error(data.error);
-      setPlaces(data.places);
+      if (direct && data.places.length === 1) pick(data.places[0]);
+      else setPlaces(data.places);
     } catch (err) {
       setPlaces(null);
       setSearchError(err instanceof Error && err.message ? err.message : "ค้นหาสถานที่ไม่สำเร็จ");
@@ -132,11 +135,19 @@ export default function LocationPicker({
             className="field min-w-0 flex-1"
             type="search"
             enterKeyHint="search"
-            placeholder="ค้นหาสถานที่ เช่น ซอยลาดพร้าว 101, เซ็นทรัลบางนา, บางเมือง สมุทรปราการ"
+            placeholder="ชื่อสถานที่ ซอย จังหวัด หรือวางลิงก์ Google Maps"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
               if (!e.target.value) setPlaces(null);
+            }}
+            onPaste={(e) => {
+              const text = e.clipboardData.getData("text").trim();
+              if (/^https?:\/\//i.test(text)) {
+                e.preventDefault();
+                setQuery(text);
+                search(text);
+              }
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -146,11 +157,14 @@ export default function LocationPicker({
               if (e.key === "Escape") setPlaces(null);
             }}
           />
-          <button type="button" className="btn-ghost shrink-0" onClick={search} disabled={searching}>
+          <button type="button" className="btn-ghost shrink-0" onClick={() => search()} disabled={searching}>
             {searching ? "กำลังค้นหา…" : "ค้นหา"}
           </button>
         </div>
         {searchError && <p className="mt-1 text-sm text-warn">{searchError}</p>}
+        <p className="mt-1 text-xs text-ink-3">
+          มีหมุดใน Google Maps อยู่แล้ว? กด “แชร์” → คัดลอกลิงก์ แล้ววางในช่องนี้ได้เลย
+        </p>
         {places && (
           <ul className="card absolute inset-x-0 top-full z-10 mt-1 max-h-72 overflow-y-auto p-1">
             {places.length === 0 && (
