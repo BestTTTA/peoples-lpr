@@ -1,5 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
+import ContactSettings from "@/components/admin/ContactSettings";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type Candidate,
@@ -61,7 +62,7 @@ export default function AdminPanel() {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">ตั้งค่า AI ครอปป้าย</h1>
+          <h1 className="text-xl font-bold">ตั้งค่าระบบ</h1>
           <p className="text-sm text-ink-3">ค่าที่บันทึกมีผลกับการครอปอัตโนมัติของทุกคนภายใน ~10 วินาที</p>
         </div>
         <button type="button" className="btn-ghost shrink-0 px-3 py-1.5 text-sm" onClick={logout}>
@@ -76,6 +77,7 @@ export default function AdminPanel() {
         onChoice={setChoice}
       />
       <SettingsAndTest choice={choice} nameOf={nameOf} />
+      <ContactSettings />
     </div>
   );
 }

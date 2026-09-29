@@ -1,9 +1,11 @@
 import Image from "next/image";
+import ContactChannels from "@/components/ContactChannels";
 
 /** Footer credits: powered by Solutionmania and Ray of Light, developed by Thetigerteam Foundation Technology. */
 export default function DevCredit({ className = "" }: { className?: string }) {
   return (
     <div className={`flex flex-col items-center gap-1.5 text-xs text-ink-3 ${className}`}>
+      <ContactChannels className="mb-3" />
       <div className="flex items-center gap-2">
         <span>powered by</span>
         <Image src="/solutionmania.png" alt="" width={20} height={20} className="rounded-full" />
