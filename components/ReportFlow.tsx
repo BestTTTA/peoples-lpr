@@ -11,7 +11,7 @@ import { type Box, cropPlate, detectPlates, preparePhoto, rotateBox, rotatePhoto
 import { MAX_PLATES } from "@/lib/limits";
 import { postForm } from "@/lib/post";
 import { reportPath } from "@/lib/urls";
-import { clean, isValidNumber, isValidPrefix, splitPlate } from "@/lib/plate";
+import { clean, isValidNumber, isValidPrefix, numberProblem, prefixProblem, splitPlate } from "@/lib/plate";
 import { isProvince } from "@/lib/provinces";
 import type { OcrResult } from "@/lib/types";
 
@@ -38,6 +38,8 @@ type Draft = {
   province: string;
   plateConf: number;
   provinceConf: number;
+  /** The OCR text needed repair (stray digits, letters missing): likely wrong even if "confident". */
+  suspect?: boolean;
   /** The finder looked at it (accepted or edited): uncertainty no longer flags it. */
   reviewed?: boolean;
   /** Left out of the report. */
@@ -194,10 +196,11 @@ export default function ReportFlow() {
       try {
         const data = await postForm<{ results: OcrResult[] }>("/api/ocr", form);
         data.results.forEach((r, j) => {
-          const { prefix, number } = splitPlate(r.plate_number);
+          const { prefix, number, suspect } = splitPlate(r.plate_number);
           Object.assign(chunk[j], {
             prefix,
             number,
+            suspect,
             province: isProvince(r.province) ? r.province : "",
             plateConf: r.plate_confidence,
             provinceConf: r.province_confidence,
@@ -230,7 +233,7 @@ export default function ReportFlow() {
   const draftValid = (d: Draft) => isValidPrefix(d.prefix) && isValidNumber(d.number) && isProvince(d.province);
   const lowConf = (d: Draft) => d.plateConf < PLATE_CONF_OK || d.provinceConf < PROVINCE_CONF_OK;
   /** Yellow: incomplete, or the reader was unsure and nobody has looked yet. */
-  const flagged = (d: Draft) => !d.skipped && (!draftValid(d) || (!d.reviewed && lowConf(d)));
+  const flagged = (d: Draft) => !d.skipped && (!draftValid(d) || (!d.reviewed && (lowConf(d) || !!d.suspect)));
   const kept = drafts.filter((d) => !d.skipped);
   const flaggedCount = drafts.filter(flagged).length;
   const allValid = kept.length > 0 && kept.every(draftValid);
@@ -507,7 +510,9 @@ export default function ReportFlow() {
           )}
           {drafts.map((d, i) => {
             if (onlyFlagged && !flagged(d)) return null;
-            const lowPlate = d.plateConf < PLATE_CONF_OK && !d.reviewed;
+            const lowPlate = (d.plateConf < PLATE_CONF_OK || !!d.suspect) && !d.reviewed;
+            const prefixErr = prefixProblem(d.prefix);
+            const numberErr = numberProblem(d.number);
             const lowProvince = d.provinceConf < PROVINCE_CONF_OK && !d.reviewed;
             if (d.skipped)
               return (
@@ -548,23 +553,25 @@ export default function ReportFlow() {
                     <label className="text-sm font-medium">
                       หมวดอักษร
                       <input
-                        className={`field mt-1 ${lowPlate || !isValidPrefix(d.prefix) ? "border-warn bg-warn/10" : ""}`}
+                        className={`field mt-1 ${prefixErr ? "border-red-500 bg-red-500/10" : lowPlate ? "border-warn bg-warn/10" : ""}`}
                         value={d.prefix}
                         maxLength={5}
                         placeholder="เช่น 3ฒน"
                         onChange={(e) => editDraft(d.key, { prefix: e.target.value })}
                       />
+                      {prefixErr && <span className="mt-1 block text-xs font-normal text-red-400">{prefixErr}</span>}
                     </label>
                     <label className="text-sm font-medium">
                       เลขทะเบียน
                       <input
-                        className={`field mt-1 ${lowPlate || !isValidNumber(d.number) ? "border-warn bg-warn/10" : ""}`}
+                        className={`field mt-1 ${numberErr ? "border-red-500 bg-red-500/10" : lowPlate ? "border-warn bg-warn/10" : ""}`}
                         value={d.number}
                         inputMode="numeric"
                         maxLength={4}
                         placeholder="เช่น 5702"
                         onChange={(e) => editDraft(d.key, { number: e.target.value.replace(/\D/g, "") })}
                       />
+                      {numberErr && <span className="mt-1 block text-xs font-normal text-red-400">{numberErr}</span>}
                     </label>
                   </div>
                   <label className="text-sm font-medium">
@@ -578,6 +585,7 @@ export default function ReportFlow() {
                   <div className="flex items-center gap-2 text-xs text-ink-3">
                     <span>
                       ความมั่นใจ: เลข {Math.round(d.plateConf * 100)}% · จังหวัด {Math.round(d.provinceConf * 100)}%
+                      {d.suspect && !d.reviewed && " · ระบบอ่านได้ไม่ครบรูปแบบ เทียบกับรูปอีกครั้ง"}
                     </span>
                     <button
                       type="button"
@@ -593,7 +601,6 @@ export default function ReportFlow() {
                         type="button"
                         className="btn-primary px-3 py-1.5 text-sm"
                         disabled={!draftValid(d)}
-                        title={draftValid(d) ? undefined : "กรอกหมวด เลข และจังหวัดให้ครบก่อน"}
                         onClick={() => editDraft(d.key, { reviewed: true })}
                       >
                         ✓ ใช้ค่านี้
@@ -605,6 +612,9 @@ export default function ReportFlow() {
                       >
                         ข้ามป้ายนี้
                       </button>
+                      {!draftValid(d) && (
+                        <span className="self-center text-xs text-ink-3">แก้ช่องสีแดงก่อนจึงกด “ใช้ค่านี้” ได้</span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -664,9 +674,9 @@ export default function ReportFlow() {
               (step === 0
                 ? `${photos.length} รูป · ${boxCount} ป้าย`
                 : step === 1
-                  ? `${kept.filter(draftValid).length}/${kept.length} ป้ายพร้อม${
-                      drafts.length > kept.length ? ` · ข้าม ${drafts.length - kept.length}` : ""
-                    }`
+                  ? kept.every(draftValid)
+                    ? `${kept.length} ป้ายพร้อม${drafts.length > kept.length ? ` · ข้าม ${drafts.length - kept.length}` : ""}`
+                    : `อีก ${kept.filter((d) => !draftValid(d)).length} ป้ายยังไม่ครบ — แก้ช่องสีแดง หรือกดข้าม`
                   : location
                     ? "พร้อมยืนยัน"
                     : "ยังไม่ได้ปักหมุด")}
