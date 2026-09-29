@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import ChannelIcon from "@/components/ChannelIcon";
 import ContactChannels from "@/components/ContactChannels";
 import {
   CHANNEL_TYPES,
@@ -7,6 +8,7 @@ import {
   type ChannelType,
   type ContactInfo,
   MAX_CHANNELS,
+  channelDisplay,
   channelHref,
 } from "@/lib/contact";
 
@@ -88,6 +90,9 @@ export default function ContactSettings() {
           const href = channelHref(c);
           return (
             <li key={i} className="flex flex-col gap-2 rounded-xl border border-line p-2 md:flex-row md:items-center">
+              <span className="hidden md:block">
+                <ChannelIcon type={c.type} size={32} />
+              </span>
               <select
                 className="field md:w-36"
                 value={c.type}
@@ -95,7 +100,7 @@ export default function ContactSettings() {
               >
                 {Object.entries(CHANNEL_TYPES).map(([k, t]) => (
                   <option key={k} value={k}>
-                    {t.icon} {t.label}
+                    {t.label}
                   </option>
                 ))}
               </select>
@@ -117,7 +122,7 @@ export default function ContactSettings() {
                 <p className={`mt-0.5 truncate text-xs ${c.value && !href && c.type !== "other" ? "text-warn" : "text-ink-3"}`}>
                   {c.value
                     ? href
-                      ? `ลิงก์: ${href}`
+                      ? `แสดงเป็น “${channelDisplay(c)}” · ลิงก์ไป ${href}`
                       : c.type === "other"
                         ? "แสดงเป็นข้อความ (ไม่มีลิงก์)"
                         : "รูปแบบไม่ถูกต้อง — จะแสดงเป็นข้อความเฉย ๆ"
