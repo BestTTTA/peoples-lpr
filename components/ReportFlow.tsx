@@ -65,8 +65,12 @@ export default function ReportFlow() {
   const [contact, setContact] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  /** Review step: show only the plates still flagged yellow. */
-  const [onlyFlagged, setOnlyFlagged] = useState(false);
+  /**
+   * Review step, "ตรวจแก้ทีละป้าย": the plates that were yellow when it was
+   * opened. A snapshot, so a plate stays on screen while it is being fixed
+   * instead of vanishing the moment its reading becomes valid.
+   */
+  const [focusKeys, setFocusKeys] = useState<string[] | null>(null);
   const [mode, setMode] = useState<CropMode>("auto");
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -222,8 +226,9 @@ export default function ReportFlow() {
     setStep(1);
   }
 
+  // Editing is not reviewing: a plate is only done when the finder says so ("ถูกต้องแล้ว").
   function editDraft(key: string, patch: Partial<Draft>) {
-    setDrafts((prev) => prev.map((d) => (d.key === key ? { ...d, reviewed: true, ...patch } : d)));
+    setDrafts((prev) => prev.map((d) => (d.key === key ? { ...d, ...patch } : d)));
   }
 
   function removeDraft(key: string) {
@@ -245,7 +250,7 @@ export default function ReportFlow() {
   function skipFlagged() {
     const next = drafts.map((d) => (flagged(d) ? (draftValid(d) ? { ...d, reviewed: true } : { ...d, skipped: true }) : d));
     setDrafts(next);
-    setOnlyFlagged(false);
+    setFocusKeys(null);
     if (next.some((d) => !d.skipped)) setStep(2);
     else setError("ไม่มีป้ายที่อ่านได้ครบ — แก้อย่างน้อย 1 ป้ายก่อน");
   }
@@ -485,18 +490,26 @@ export default function ReportFlow() {
             คือระบบไม่แน่ใจ
           </p>
           {drafts.length === 0 && <div className="card p-4 text-sm">ไม่มีป้ายเหลืออยู่ — กลับไปตีกรอบใหม่</div>}
-          {(flaggedCount > 0 || onlyFlagged) && (
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-warn/50 bg-warn/10 p-3 text-sm">
+          {(flaggedCount > 0 || focusKeys) && (
+            <div
+              className={`flex flex-wrap items-center gap-2 rounded-xl border p-3 text-sm ${
+                flaggedCount > 0 ? "border-warn/50 bg-warn/10" : "border-emerald-500/50 bg-emerald-500/10"
+              }`}
+            >
               <span className="font-semibold">
-                {flaggedCount > 0 ? `⚠️ มี ${flaggedCount} ป้ายที่ระบบไม่แน่ใจ (สีเหลือง)` : "✓ ตรวจครบแล้ว"}
+                {flaggedCount > 0
+                  ? focusKeys
+                    ? `⚠️ เหลือ ${flaggedCount} ป้ายที่ต้องตรวจ`
+                    : `⚠️ มี ${flaggedCount} ป้ายที่ระบบไม่แน่ใจ (สีเหลือง)`
+                  : "✓ ตรวจครบแล้ว — กด “ถัดไป” ได้เลย"}
               </span>
               <div className="ml-auto flex flex-wrap gap-2">
                 <button
                   type="button"
                   className="btn-ghost px-3 py-1.5 text-sm"
-                  onClick={() => setOnlyFlagged(!onlyFlagged)}
+                  onClick={() => setFocusKeys(focusKeys ? null : drafts.filter(flagged).map((d) => d.key))}
                 >
-                  {onlyFlagged ? "แสดงทุกป้าย" : "ตรวจแก้ทีละป้าย"}
+                  {focusKeys ? "แสดงทุกป้าย" : "ตรวจแก้ทีละป้าย"}
                 </button>
                 {flaggedCount > 0 && (
                   <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={skipFlagged}>
@@ -512,7 +525,8 @@ export default function ReportFlow() {
             </div>
           )}
           {drafts.map((d, i) => {
-            if (onlyFlagged && !flagged(d)) return null;
+            if (focusKeys && !focusKeys.includes(d.key)) return null;
+            const done = !flagged(d) && !!d.reviewed;
             const lowPlate = (d.plateConf < PLATE_CONF_OK || !!d.suspect) && !d.reviewed;
             const prefixErr = prefixProblem(d.prefix);
             const numberErr = numberProblem(d.number);
@@ -537,7 +551,9 @@ export default function ReportFlow() {
             return (
               <article
                 key={d.key}
-                className={`card grid gap-3 p-3 sm:grid-cols-[220px_1fr] ${flagged(d) ? "border-warn/60" : ""}`}
+                className={`card grid gap-3 p-3 sm:grid-cols-[220px_1fr] ${
+                  flagged(d) ? "border-warn/60" : done ? "border-emerald-500/60" : ""
+                }`}
               >
                 <div className="flex flex-col gap-2">
                   <div className="relative overflow-hidden rounded-lg bg-surface-2">
@@ -587,7 +603,7 @@ export default function ReportFlow() {
                     />
                     {!d.province && !d.reviewed && (
                       <span className="mt-1 block text-xs font-normal text-ink-3">
-                        อ่านจังหวัดไม่ได้ — เลือกจากรายการ หรือกด “ใช้ค่านี้” เพื่อส่งแบบไม่ระบุจังหวัด
+                        อ่านจังหวัดไม่ได้ — เลือกจากรายการ หรือกด “ถูกต้องแล้ว” เพื่อส่งแบบไม่ระบุจังหวัด
                       </span>
                     )}
                   </label>
@@ -612,7 +628,7 @@ export default function ReportFlow() {
                         disabled={!draftValid(d)}
                         onClick={() => editDraft(d.key, { reviewed: true })}
                       >
-                        ✓ ใช้ค่านี้
+                        ✓ ถูกต้องแล้ว
                       </button>
                       <button
                         type="button"
@@ -622,8 +638,20 @@ export default function ReportFlow() {
                         ข้ามป้ายนี้
                       </button>
                       {!draftValid(d) && (
-                        <span className="self-center text-xs text-ink-3">แก้ช่องสีแดงก่อนจึงกด “ใช้ค่านี้” ได้</span>
+                        <span className="self-center text-xs text-ink-3">แก้ช่องสีแดงก่อนจึงกด “ถูกต้องแล้ว” ได้</span>
                       )}
+                    </div>
+                  )}
+                  {done && (
+                    <div className="flex items-center gap-2 text-sm text-emerald-400">
+                      ✓ ตรวจแล้ว
+                      <button
+                        type="button"
+                        className="text-xs text-ink-3 hover:text-ink"
+                        onClick={() => editDraft(d.key, { reviewed: false })}
+                      >
+                        แก้อีกครั้ง
+                      </button>
                     </div>
                   )}
                 </div>
