@@ -18,7 +18,7 @@ export async function generateMetadata({ searchParams }: PageProps<"/">): Promis
   const { plate, reportId } = await readParams(searchParams);
   if (plate)
     return {
-      title: `ตามหาป้าย ${plate.prefix} ${plate.number} ${plate.province} — ป้ายทะเบียนหาย.com`,
+      title: `ตามหาป้าย ${plate.prefix} ${plate.number} ${plate.province || "ทุกจังหวัด"} — ป้ายทะเบียนหาย.com`,
       alternates: { canonical: href(searchPath(plate.prefix, plate.number, plate.province)) },
     };
   if (reportId)

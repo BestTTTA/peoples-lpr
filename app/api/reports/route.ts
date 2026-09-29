@@ -62,7 +62,8 @@ export async function POST(request: Request) {
   for (const p of meta.plates) {
     if (!isValidPrefix(p.prefix)) return bad(`หมวดอักษร "${p.prefix}" ไม่ถูกต้อง`);
     if (!isValidNumber(p.number)) return bad(`เลขทะเบียน "${p.number}" ไม่ถูกต้อง`);
-    if (!isProvince(p.province)) return bad(`ไม่พบจังหวัด "${p.province}"`);
+    // "" = the finder could not tell the province (worn plate, bad read).
+    if (p.province !== "" && !isProvince(p.province)) return bad(`ไม่พบจังหวัด "${p.province}"`);
     if (!Number.isInteger(p.photo) || p.photo < 0 || p.photo >= photos.length)
       return bad("ข้อมูลรูปไม่ถูกต้อง");
   }

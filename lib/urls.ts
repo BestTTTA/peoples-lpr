@@ -7,9 +7,9 @@ import { filterProvinces, isProvince } from "./provinces";
 export const REPORT_PATH = "/แจ้งพบป้าย";
 export const FOUND_PATH = "/ป้ายที่พบ";
 
-/** /ค้นหา/3ฒน-5702-กรุงเทพมหานคร */
+/** /ค้นหา/3ฒน-5702-กรุงเทพมหานคร, or /ค้นหา/3ฒน-5702 for any province */
 export function searchPath(prefix: string, number: string, province: string): string {
-  return `/ค้นหา/${clean(prefix)}-${clean(number)}-${province}`;
+  return `/ค้นหา/${clean(prefix)}-${clean(number)}${province ? `-${province}` : ""}`;
 }
 
 /** /จุดพบ/<report id> */
@@ -22,7 +22,7 @@ export const href = (path: string) => encodeURI(path);
 
 export type PlateQuery = { prefix: string; number: string; province: string };
 
-/** Read "3ฒน-5702-กรุงเทพมหานคร" (or "3ฒน-5702-กทม") back into a search. */
+/** Read "3ฒน-5702-กรุงเทพมหานคร" ("3ฒน-5702-กทม", or "3ฒน-5702" for any province) back into a search. */
 export function parsePlateSlug(slug: string | undefined): PlateQuery | null {
   if (!slug) return null;
   let s = slug;
@@ -31,9 +31,13 @@ export function parsePlateSlug(slug: string | undefined): PlateQuery | null {
   } catch {}
   const [prefix, number, ...rest] = s.trim().split("-");
   const place = rest.join("-").trim();
-  if (!prefix || !number || !place) return null;
-  const aliasHit = filterProvinces(place);
-  const province = isProvince(place) ? place : aliasHit.length === 1 ? aliasHit[0] : "";
-  if (!isValidPrefix(prefix) || !isValidNumber(number) || !province) return null;
+  if (!prefix || !number) return null;
+  let province = "";
+  if (place) {
+    const aliasHit = filterProvinces(place);
+    province = isProvince(place) ? place : aliasHit.length === 1 ? aliasHit[0] : "";
+    if (!province) return null;
+  }
+  if (!isValidPrefix(prefix) || !isValidNumber(number)) return null;
   return { prefix: clean(prefix), number: clean(number), province };
 }

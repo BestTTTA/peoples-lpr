@@ -76,7 +76,7 @@ export default function WatchAlert() {
         {found.map(({ watch, hits }) => (
           <section key={`${watch.prefix}${watch.number}${watch.province}`} className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2 border-t border-line pt-3">
-              <PlateBadge prefix={watch.prefix} number={watch.number} province={watch.province} size="sm" />
+              <PlateBadge prefix={watch.prefix} number={watch.number} province={watch.province} size="sm" emptyProvince="ทุกจังหวัด" />
               <button type="button" className="text-sm text-ink-3 hover:text-ink" onClick={() => stop(watch)}>
                 ได้คืนแล้ว / เลิกตามหา
               </button>

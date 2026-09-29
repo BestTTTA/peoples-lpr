@@ -35,7 +35,7 @@ export default function SearchHint() {
           <li className="flex gap-2">
             <b className="w-4 text-warn">3</b>
             <span>
-              <b>จังหวัด</b> — บรรทัดล่างของป้าย พิมพ์บางส่วนได้ เช่น <code>กทม</code>
+              <b>จังหวัด</b> — บรรทัดล่างของป้าย พิมพ์บางส่วนได้ เช่น <code>กทม</code> · ไม่ทราบจังหวัดก็เว้นไว้ได้ ระบบจะค้นทุกจังหวัด
             </span>
           </li>
         </ol>

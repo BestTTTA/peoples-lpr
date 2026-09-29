@@ -230,10 +230,13 @@ export default function ReportFlow() {
     setDrafts((prev) => prev.filter((d) => d.key !== key));
   }
 
-  const draftValid = (d: Draft) => isValidPrefix(d.prefix) && isValidNumber(d.number) && isProvince(d.province);
+  // The province may be left out ("ไม่ระบุจังหวัด") when the plate doesn't show it clearly.
+  const draftValid = (d: Draft) =>
+    isValidPrefix(d.prefix) && isValidNumber(d.number) && (d.province === "" || isProvince(d.province));
   const lowConf = (d: Draft) => d.plateConf < PLATE_CONF_OK || d.provinceConf < PROVINCE_CONF_OK;
   /** Yellow: incomplete, or the reader was unsure and nobody has looked yet. */
-  const flagged = (d: Draft) => !d.skipped && (!draftValid(d) || (!d.reviewed && (lowConf(d) || !!d.suspect)));
+  const flagged = (d: Draft) =>
+    !d.skipped && (!draftValid(d) || (!d.reviewed && (lowConf(d) || !!d.suspect || d.province === "")));
   const kept = drafts.filter((d) => !d.skipped);
   const flaggedCount = drafts.filter(flagged).length;
   const allValid = kept.length > 0 && kept.every(draftValid);
@@ -503,7 +506,7 @@ export default function ReportFlow() {
               </div>
               {flaggedCount > 0 && (
                 <p className="w-full text-xs text-ink-3">
-                  “ข้าม” = ใช้ค่าที่ระบบอ่านได้ตามเดิม ส่วนป้ายที่อ่านไม่ครบ (ไม่มีเลขหรือจังหวัด) จะไม่ถูกส่ง
+                  “ข้าม” = ใช้ค่าที่ระบบอ่านได้ตามเดิม (จังหวัดที่อ่านไม่ได้ส่งเป็น “ไม่ระบุจังหวัด”) ส่วนป้ายที่ไม่มีหมวดหรือเลขจะไม่ถูกส่ง
                 </p>
               )}
             </div>
@@ -577,10 +580,16 @@ export default function ReportFlow() {
                   <label className="text-sm font-medium">
                     จังหวัด
                     <ProvinceInput
-                      className={`mt-1 ${lowProvince || !d.province ? "[&_input]:border-warn [&_input]:bg-warn/10 [&_select]:border-warn [&_select]:bg-warn/10" : ""}`}
+                      className={`mt-1 ${lowProvince || (!d.province && !d.reviewed) ? "[&_.field]:border-warn [&_.field]:bg-warn/10" : ""}`}
                       value={d.province}
                       onChange={(v) => editDraft(d.key, { province: v })}
+                      emptyLabel="ไม่ระบุจังหวัด"
                     />
+                    {!d.province && !d.reviewed && (
+                      <span className="mt-1 block text-xs font-normal text-ink-3">
+                        อ่านจังหวัดไม่ได้ — เลือกจากรายการ หรือกด “ใช้ค่านี้” เพื่อส่งแบบไม่ระบุจังหวัด
+                      </span>
+                    )}
                   </label>
                   <div className="flex items-center gap-2 text-xs text-ink-3">
                     <span>

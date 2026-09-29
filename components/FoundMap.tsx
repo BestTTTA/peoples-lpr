@@ -37,7 +37,7 @@ function popupHtml(spot: Spot): string {
       (p) =>
         `<a class="plate-chip" href="${esc(href(searchPath(p.prefix, p.number, p.province)))}"><b>${esc(
           `${p.prefix} ${p.number}`,
-        )}</b><small>${esc(p.province)}</small></a>`,
+        )}</b><small>${esc(p.province || "ไม่ระบุจังหวัด")}</small></a>`,
     )
     .join("");
   const more = plates.length - POPUP_CHIPS;

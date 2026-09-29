@@ -68,7 +68,6 @@ export default function FindView({
 
   const prefixOk = isValidPrefix(prefix);
   const numberOk = isValidNumber(number);
-  const provinceOk = province !== "";
   const plateTotal = reports.reduce((s, r) => s + r.plates.length, 0);
 
   function select(id: string, scroll = false) {
@@ -88,7 +87,7 @@ export default function FindView({
   function search(e: React.FormEvent) {
     e.preventDefault();
     setTouched(true);
-    if (!prefixOk || !numberOk || !provinceOk) return;
+    if (!prefixOk || !numberOk) return;
     runSearch({ prefix: clean(prefix), number: clean(number), province });
   }
 
@@ -198,7 +197,7 @@ export default function FindView({
               <div className="rounded-xl border border-line bg-surface-2/60 p-3">
                 <div className="mb-1.5 text-sm font-medium">กรองจุดตามจังหวัดของป้าย</div>
                 <div className="flex gap-2">
-                  <ProvinceInput className="flex-1" value={filterProvince} onChange={setFilterProvince} />
+                  <ProvinceInput className="flex-1" value={filterProvince} onChange={setFilterProvince} emptyLabel="ทุกจังหวัด" />
                   {filterProvince && (
                     <button type="button" className="btn-ghost px-3" onClick={() => setFilterProvince("")}>
                       ล้าง
@@ -241,20 +240,20 @@ export default function FindView({
               <label className="text-sm font-medium">
                 <span className="mb-1 flex items-center gap-1.5">
                   <i className="h-2 w-2 rounded-full bg-warn" /> จังหวัด
+                  <span className="font-normal text-ink-3">(ไม่บังคับ)</span>
                 </span>
-                <ProvinceInput value={province} onChange={setProvince} />
+                <ProvinceInput value={province} onChange={setProvince} emptyLabel="ทุกจังหวัด" />
               </label>
 
-              {touched && (!prefixOk || !numberOk || !provinceOk) && (
+              {touched && (!prefixOk || !numberOk) && (
                 <p className="text-xs text-warn">
                   {!prefixOk && "หมวดอักษรต้องเป็นตัวอักษรไทย 1–2 ตัว (มีเลขนำหน้าได้) · "}
-                  {!numberOk && "เลขทะเบียน 1–4 หลัก · "}
-                  {!provinceOk && "เลือกจังหวัดจากรายการ"}
+                  {!numberOk && "เลขทะเบียน 1–4 หลัก"}
                 </p>
               )}
 
               <div className="flex items-center gap-3">
-                <PlateBadge prefix={clean(prefix)} number={number} province={province} size="sm" />
+                <PlateBadge prefix={clean(prefix)} number={number} province={province} size="sm" emptyProvince="ทุกจังหวัด" />
                 <button type="submit" className="btn-primary ml-auto" disabled={loading}>
                   {loading ? "กำลังค้นหา…" : "ค้นหา"}
                 </button>
@@ -423,7 +422,13 @@ function SearchPopup({
 
         {!found && (
           <div className="self-center">
-            <PlateBadge prefix={query.prefix} number={query.number} province={query.province} size="sm" />
+            <PlateBadge
+              prefix={query.prefix}
+              number={query.number}
+              province={query.province}
+              size="sm"
+              emptyProvince="ทุกจังหวัด"
+            />
           </div>
         )}
 
@@ -483,7 +488,7 @@ function WatchList({ onPick }: { onPick: (q: PlateQuery) => void }) {
         {watches.map((w) => (
           <li key={`${w.prefix}${w.number}${w.province}`} className="flex items-center gap-2">
             <button type="button" onClick={() => onPick(w)} title="ค้นหาอีกครั้ง">
-              <PlateBadge prefix={w.prefix} number={w.number} province={w.province} size="sm" />
+              <PlateBadge prefix={w.prefix} number={w.number} province={w.province} size="sm" emptyProvince="ทุกจังหวัด" />
             </button>
             <span className="flex-1 text-xs text-ink-3">ฝากไว้ {timeAgo(w.since)}</span>
             <button type="button" className="text-xs text-ink-3 hover:text-red-400" onClick={() => removeWatch(w)}>

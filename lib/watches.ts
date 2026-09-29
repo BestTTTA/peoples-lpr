@@ -19,7 +19,7 @@ const same = (a: PlateQuery, b: PlateQuery) =>
 function parse(raw: string): Watch[] {
   try {
     const v = JSON.parse(raw);
-    return Array.isArray(v) ? v.filter((w) => w && w.prefix && w.number && w.province) : [];
+    return Array.isArray(v) ? v.filter((w) => w && w.prefix && w.number && typeof w.province === "string") : [];
   } catch {
     return [];
   }

@@ -39,15 +39,16 @@ export default function Dashboard() {
     const plates = all.flatMap((r) => r.plates);
     const byProvince = new Map<string, number>();
     for (const p of plates) byProvince.set(p.province, (byProvince.get(p.province) ?? 0) + 1);
+    const known = [...byProvince.keys()].filter(Boolean).length;
     return {
       plates: plates.length,
       points: all.length,
-      provinces: byProvince.size,
+      provinces: known,
       // Per report: a spot can mix old and new reports.
       fresh: (reports ?? [])
         .filter((r) => recencyOf(r.createdAt) === "new")
         .reduce((s, r) => s + r.plates.length, 0),
-      top: [...byProvince.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8),
+      top: [...byProvince.entries()].filter(([name]) => name).sort((a, b) => b[1] - a[1]).slice(0, 8),
     };
   }, [all, reports]);
 
@@ -124,7 +125,7 @@ export default function Dashboard() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <ProvinceInput className="md:w-64" value={province} onChange={setProvince} placeholder="ทุกจังหวัด" />
+        <ProvinceInput className="md:w-64" value={province} onChange={setProvince} emptyLabel="ทุกจังหวัด" />
         <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1 text-sm">
           {(
             [

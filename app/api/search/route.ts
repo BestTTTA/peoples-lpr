@@ -10,9 +10,9 @@ export async function GET(request: NextRequest) {
   const number = clean(q.get("number") ?? "");
   const province = q.get("province") ?? "";
 
-  // All three parts are required so the map can't be browsed plate by plate.
-  if (!isValidPrefix(prefix) || !isValidNumber(number) || !isProvince(province))
-    return Response.json({ error: "กรุณากรอกหมวดอักษร เลขทะเบียน และจังหวัดให้ครบ" }, { status: 400 });
+  // Prefix and number are required; the province is optional ("" = any province).
+  if (!isValidPrefix(prefix) || !isValidNumber(number) || (province !== "" && !isProvince(province)))
+    return Response.json({ error: "กรุณากรอกหมวดอักษรและเลขทะเบียนให้ครบ" }, { status: 400 });
 
   const target = prefix + number;
   const exact: SearchHit[] = [];
@@ -31,13 +31,12 @@ export async function GET(request: NextRequest) {
     };
     for (const p of r.plates) {
       const text = p.prefix + p.number;
-      if (text === target && p.province === province) exact.push({ report, plate: p });
+      // A plate reported without a province could be anyone's with that text.
+      const sameProvince = province === "" || p.province === "" || p.province === province;
+      if (text === target && sameProvince) exact.push({ report, plate: p });
       // Near misses cover a single mis-read character, or the right plate
-      // filed under the wrong province (province OCR is the weaker read).
-      else if (
-        (p.province === province && distance(text, target) === 1) ||
-        (p.province !== province && text === target)
-      )
+      // filed under another province (province OCR is the weaker read).
+      else if ((sameProvince && distance(text, target) === 1) || (!sameProvince && text === target))
         near.push({ report, plate: p });
     }
   }
