@@ -1,7 +1,10 @@
 """Plate detector for auto-crop (YOLO, ultralytics).
 
     POST /crops   multipart: file (image), model, conf, iou, imgsz, tile, overlap,
-                  aspect_min, aspect_max (all but file optional)
+                  aspect_min, aspect_max, tilt (all but file optional)
+      Each crop also has "angle" (degrees to turn the plate counter-clockwise to
+      make it level; 0 for upright plates), "center" and "size" (the plate's own
+      width/height, before tilting). "box" is the upright box around it.
       -> {"count": n, "model": id, "crops": [{"box": [x1, y1, x2, y2], "conf": 0.87,
                                               "class_id": 0, "class_name": "license_plate"}]}
     GET  /health
@@ -37,6 +40,7 @@ from contextlib import asynccontextmanager
 from io import BytesIO
 from pathlib import Path
 
+import cv2
 import numpy as np
 import torch
 import torchvision
@@ -125,6 +129,74 @@ def _tiles(w: int, h: int, size: int, overlap: float) -> list[tuple[int, int, in
     return [(x, y, min(w, x + size), min(h, y + size)) for y in starts(h) for x in starts(w)]
 
 
+def _rotate(frame: np.ndarray, angle: float) -> tuple[np.ndarray, np.ndarray]:
+    """The image turned counter-clockwise by `angle` on a canvas that fits it, and the map back."""
+    if not angle:
+        return frame, np.array([[1, 0, 0], [0, 1, 0]], dtype=np.float32)
+    h, w = frame.shape[:2]
+    m = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1.0)
+    cos, sin = abs(m[0, 0]), abs(m[0, 1])
+    nw, nh = int(h * sin + w * cos), int(h * cos + w * sin)
+    m[0, 2] += nw / 2 - w / 2
+    m[1, 2] += nh / 2 - h / 2
+    view = cv2.warpAffine(frame, m, (nw, nh), borderValue=(114, 114, 114))
+    return view, cv2.invertAffineTransform(m)
+
+
+def _find_upright(yolo, frame, conf, iou, imgsz, tile, overlap, shaped) -> tuple[list[tuple], int]:
+    """Plate boxes in one view: whole image, plus overlapping tiles when it is bigger than one."""
+    h, w = frame.shape[:2]
+    # Whole image first (big plates), then, for images larger than one tile,
+    # overlapping tiles: the model sees each at full resolution instead of the
+    # whole photo squeezed to imgsz, which is what loses small plates (many
+    # plates on a table, portrait photos).
+    windows = [(0, 0, w, h)]
+    if tile >= 320 and max(w, h) > tile * 1.15:
+        windows += _tiles(w, h, tile, overlap)
+    results = yolo.predict([frame[y1:y2, x1:x2] for x1, y1, x2, y2 in windows], conf=conf, iou=iou, imgsz=imgsz, verbose=False)
+
+    boxes = []
+    for (wx1, wy1, wx2, wy2), r in zip(windows, results):
+        whole = (wx1, wy1, wx2, wy2) == (0, 0, w, h)
+        for (x1, y1, x2, y2), score, cls in zip(r.boxes.xyxy.tolist(), r.boxes.conf.tolist(), r.boxes.cls.tolist()):
+            # A box touching an inner tile edge is a cut plate; a neighbouring tile has it whole.
+            if not whole and (
+                (x1 <= 2 and wx1 > 0) or (y1 <= 2 and wy1 > 0) or (x2 >= wx2 - wx1 - 2 and wx2 < w) or (y2 >= wy2 - wy1 - 2 and wy2 < h)
+            ):
+                continue
+            boxes.append((x1 + wx1, y1 + wy1, x2 + wx1, y2 + wy1, score, int(cls)))
+
+    def shaped_box(b) -> bool:
+        return shaped(b[2] - b[0], b[3] - b[1])
+
+    if len(windows) > 1:
+        boxes = _merge(boxes, 0.5, shaped_box)
+    # Plate-shaped in this view, i.e. in the plate's own frame: the upright box
+    # around a tilted plate says nothing about its shape.
+    return [b for b in boxes if shaped_box(b)], len(windows) - 1
+
+
+def _merge_views(dets: list[dict]) -> list[dict]:
+    """One detection per plate across views: most confident first, dropping any
+    that mostly overlaps one already kept. Overlap is measured on the plates' own
+    (rotated) outlines, so neighbours on a crowded table do not knock each other out."""
+    kept: list[dict] = []
+    # The level view wins ties: a turned view mostly re-finds the same plates with a looser box.
+    for d in sorted(dets, key=lambda d: d["conf"] + (0.1 if d["angle"] == 0 else 0.0), reverse=True):
+        a = d["quad"].astype(np.float32)
+        area_a = cv2.contourArea(a)
+        clash = False
+        for k in kept:
+            b = k["quad"].astype(np.float32)
+            inter, _ = cv2.intersectConvexConvex(a, b)
+            if inter > 0.5 * min(area_a, cv2.contourArea(b)):
+                clash = True
+                break
+        if not clash:
+            kept.append(d)
+    return kept
+
+
 def _merge(boxes: list[tuple], iou: float, shaped) -> list[tuple]:
     """NMS across tiles, then drop boxes mostly inside a bigger plate-shaped one (plates cut by a tile)."""
     if not boxes:
@@ -164,6 +236,7 @@ async def crops(
     overlap: float = Form(0.3),
     aspect_min: float = Form(1.1),
     aspect_max: float = Form(3.6),
+    tilt: float = Form(0.0),
 ):
     data = await file.read()
     if not data or len(data) > MAX_IMAGE_BYTES:
@@ -174,53 +247,52 @@ async def crops(
     except (UnidentifiedImageError, OSError):
         raise HTTPException(400, "not an image")
 
-    model_id = model
-    yolo = _model(model_id)
+    yolo = _model(model)
     frame = np.asarray(img)[:, :, ::-1]  # ultralytics takes numpy images as BGR
-    h, w = frame.shape[:2]
     conf = min(max(conf, 0.01), 0.99)
     iou = min(max(iou, 0.05), 0.95)
     imgsz = min(max(imgsz // 32 * 32, 320), 1280)
     overlap = min(max(overlap, 0.05), 0.6)
+    tilt = min(max(tilt, 0.0), 60.0)
 
-    # Whole image first (big plates), then, for images larger than one tile,
-    # overlapping tiles: the model sees each at full resolution instead of the
-    # whole photo squeezed to imgsz, which is what loses small plates (many
-    # plates on a table, portrait photos).
-    windows = [(0, 0, w, h)]
-    if tile >= 320 and max(w, h) > tile * 1.15:
-        windows += _tiles(w, h, tile, overlap)
-    crops = [frame[y1:y2, x1:x2] for x1, y1, x2, y2 in windows]
-    results = yolo.predict(crops, conf=conf, iou=iou, imgsz=imgsz, verbose=False)
+    def shaped(w: float, h: float) -> bool:
+        return aspect_min <= w / max(1.0, h) <= aspect_max
 
-    boxes = []
-    for (wx1, wy1, wx2, wy2), r in zip(windows, results):
-        whole = (wx1, wy1, wx2, wy2) == (0, 0, w, h)
-        for (x1, y1, x2, y2), score, cls in zip(r.boxes.xyxy.tolist(), r.boxes.conf.tolist(), r.boxes.cls.tolist()):
-            # A box touching an inner tile edge is a cut plate; a neighbouring tile has it whole.
-            if not whole and (
-                (x1 <= 2 and wx1 > 0) or (y1 <= 2 and wy1 > 0) or (x2 >= wx2 - wx1 - 2 and wx2 < w) or (y2 >= wy2 - wy1 - 2 and wy2 < h)
-            ):
-                continue
-            boxes.append((x1 + wx1, y1 + wy1, x2 + wx1, y2 + wy1, score, int(cls)))
+    # Detectors find level plates; past ~30 degrees of tilt they miss most. So
+    # also look at the photo turned both ways by `tilt`: a tilted plate is level
+    # in one of those views. Each find maps back with its angle.
+    dets: list[dict] = []
+    tiles_run = 0
+    for angle in [0.0] + ([tilt, -tilt] if tilt >= 5 else []):
+        view, back = _rotate(frame, angle)
+        found, n_tiles = _find_upright(yolo, view, conf, iou, imgsz, tile, overlap, shaped)
+        tiles_run += n_tiles
+        for x1, y1, x2, y2, score, cls in found:
+            corners = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
+            quad = cv2.transform(corners[None], back)[0] if angle else corners
+            dets.append({"quad": quad, "conf": score, "cls": cls, "angle": angle, "size": (x2 - x1, y2 - y1)})
 
-    def shaped(b) -> bool:
-        return aspect_min <= (b[2] - b[0]) / max(1.0, b[3] - b[1]) <= aspect_max
-
-    if len(windows) > 1:
-        boxes = _merge(boxes, 0.5, shaped)
-
-    out = [
-        {
-            "box": [round(x1), round(y1), round(x2), round(y2)],
-            "conf": round(score, 4),
-            "class_id": cls,
-            "class_name": yolo.names[cls],
-        }
-        for x1, y1, x2, y2, score, cls in boxes
-    ]
+    kept = _merge_views(dets) if tilt >= 5 else dets
+    h, w = frame.shape[:2]
+    out = []
+    for d in kept:
+        q = d["quad"]
+        x1, y1 = np.clip(q.min(axis=0), 0, [w, h])
+        x2, y2 = np.clip(q.max(axis=0), 0, [w, h])
+        cx, cy = q.mean(axis=0)
+        out.append(
+            {
+                "box": [round(float(x1)), round(float(y1)), round(float(x2)), round(float(y2))],
+                "conf": round(d["conf"], 4),
+                "class_id": d["cls"],
+                "class_name": yolo.names[d["cls"]],
+                "angle": d["angle"],
+                "center": [round(float(cx), 1), round(float(cy), 1)],
+                "size": [round(float(d["size"][0]), 1), round(float(d["size"][1]), 1)],
+            }
+        )
     out.sort(key=lambda c: c["conf"], reverse=True)
-    return {"count": len(out), "model": model_id, "tiles": len(windows) - 1, "crops": out}
+    return {"count": len(out), "model": model, "tiles": tiles_run, "crops": out}
 
 
 @app.get("/models")

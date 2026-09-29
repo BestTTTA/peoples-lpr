@@ -2,7 +2,18 @@
 import { postForm } from "./post";
 
 /** Normalized (0–1) rectangle relative to the photo. */
-export type Box = { x: number; y: number; w: number; h: number };
+export type Box = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /**
+   * A tilted plate found by the AI: degrees to turn it counter-clockwise to
+   * level it, and its own width/height as fractions of the photo's width.
+   * The crop is levelled, which OCR reads far better.
+   */
+  rot?: { angle: number; w: number; h: number };
+};
 
 const MAX_EDGE = 2000;
 
@@ -27,6 +38,24 @@ export async function preparePhoto(file: File): Promise<{ blob: Blob; width: num
 /** Cut one plate out of a prepared photo, with a little padding for the OCR model. */
 export async function cropPlate(photo: Blob, box: Box): Promise<Blob> {
   const bmp = await createImageBitmap(photo);
+  if (box.rot) {
+    // Level the plate: turn the photo about the plate's centre, then cut its own rectangle.
+    const cx = (box.x + box.w / 2) * bmp.width;
+    const cy = (box.y + box.h / 2) * bmp.height;
+    const pw = box.rot.w * bmp.width * 1.04;
+    const ph = box.rot.h * bmp.width * 1.04;
+    const scale = Math.min(1, 800 / pw, 800 / ph);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(pw * scale));
+    canvas.height = Math.max(1, Math.round(ph * scale));
+    const ctx = canvas.getContext("2d")!;
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.scale(scale, scale);
+    ctx.rotate((-box.rot.angle * Math.PI) / 180);
+    ctx.drawImage(bmp, -cx, -cy);
+    bmp.close();
+    return toJpeg(canvas, 0.92);
+  }
   const pad = 0.02;
   const x0 = Math.max(0, box.x - pad * box.w) * bmp.width;
   const y0 = Math.max(0, box.y - pad * box.h) * bmp.height;
@@ -47,14 +76,17 @@ export async function cropPlate(photo: Blob, box: Box): Promise<Blob> {
 export async function detectPlates(photo: { blob: Blob; width: number; height: number }): Promise<Box[]> {
   const form = new FormData();
   form.append("file", photo.blob, "photo.jpg");
-  const { boxes } = await postForm<{ boxes: { box: [number, number, number, number] }[] }>("/api/detect", form);
+  const { boxes } = await postForm<{
+    boxes: { box: [number, number, number, number]; angle?: number; size?: [number, number] }[];
+  }>("/api/detect", form);
   const clamp = (v: number) => Math.min(1, Math.max(0, v));
   return boxes
-    .map(({ box: [x1, y1, x2, y2] }) => ({
+    .map(({ box: [x1, y1, x2, y2], angle, size }): Box => ({
       x: clamp(x1 / photo.width),
       y: clamp(y1 / photo.height),
       w: clamp((x2 - x1) / photo.width),
       h: clamp((y2 - y1) / photo.height),
+      ...(angle && size ? { rot: { angle, w: size[0] / photo.width, h: size[1] / photo.width } } : {}),
     }))
     .filter((b) => b.w > 0.01 && b.h > 0.01)
     // Reading order (top-to-bottom, then left-to-right) so numbering follows the photo.

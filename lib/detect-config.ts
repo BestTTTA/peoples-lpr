@@ -14,6 +14,8 @@ export type DetectSettings = {
   tileSize: number;
   /** How much neighbouring tiles overlap (fraction). */
   tileOverlap: number;
+  /** Also search the photo turned ± this many degrees, for tilted plates; 0 = off. */
+  tiltAngle: number;
 };
 
 export const DETECT_LIMITS: Record<keyof DetectSettings, { min: number; max: number; step: number; label: string; hint: string }> = {
@@ -23,6 +25,7 @@ export const DETECT_LIMITS: Record<keyof DetectSettings, { min: number; max: num
   aspectMin: { min: 0.5, max: 3, step: 0.1, label: "สัดส่วนกรอบต่ำสุด (กว้าง÷สูง)", hint: "ตัดกรอบที่แคบ/สูงเกินกว่าจะเป็นป้าย" },
   aspectMax: { min: 1.5, max: 8, step: 0.1, label: "สัดส่วนกรอบสูงสุด (กว้าง÷สูง)", hint: "ตัดกรอบที่กว้างเกิน เช่นกรอบคร่อมป้ายทั้งแถว · ป้ายไทยจริงถึง ~3.4" },
   tileSize: { min: 0, max: 1280, step: 32, label: "แบ่งภาพเป็นชิ้น (tiling) ขนาดชิ้น px", hint: "0 = ปิด · แบ่งรูปเป็นชิ้นซ้อนกันแล้วหาป้ายทีละชิ้น ช่วยมากกับรูปแนวตั้ง/รูปที่มีป้ายเยอะ (ทดสอบ: เจอเพิ่ม 2 เท่า) · ช้าลงตามจำนวนชิ้น" },
+  tiltAngle: { min: 0, max: 60, step: 5, label: "หาป้ายเอียง (องศา)", hint: "0 = ปิด · หมุนรูปไป ± เท่านี้แล้วหาอีกรอบ เพื่อจับป้ายที่เอียงเกิน ~30° และส่งป้ายที่หมุนตรงแล้วให้ OCR · ช้าลงประมาณ 3 เท่า" },
   tileOverlap: { min: 0.1, max: 0.5, step: 0.05, label: "ชิ้นซ้อนกัน (overlap)", hint: "ควรกว้างกว่าป้าย 1 ป้ายในรูป เพื่อให้ป้ายที่ถูกตัดขอบชิ้นเห็นเต็มในชิ้นข้าง ๆ" },
 };
 
@@ -45,11 +48,18 @@ export function sanitizeDetect(input: unknown): DetectSettings | null {
   return out;
 }
 
-export type RawBox = { box: [number, number, number, number]; conf: number };
+export type RawBox = {
+  box: [number, number, number, number];
+  conf: number;
+  /** Tilted plates: degrees to turn counter-clockwise to level it, and its own width/height. */
+  angle?: number;
+  size?: [number, number];
+};
 
-/** Does a detector box look like a plate under these settings? */
-export function plateShaped({ box: [x1, y1, x2, y2] }: RawBox, s: DetectSettings): boolean {
-  const ratio = (x2 - x1) / Math.max(1, y2 - y1);
+/** Does a detector box look like a plate under these settings? (Tilted ones by their own shape.) */
+export function plateShaped({ box: [x1, y1, x2, y2], size }: RawBox, s: DetectSettings): boolean {
+  const [w, h] = size ?? [x2 - x1, y2 - y1];
+  const ratio = w / Math.max(1, h);
   return ratio >= s.aspectMin && ratio <= s.aspectMax;
 }
 

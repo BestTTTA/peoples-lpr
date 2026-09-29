@@ -14,6 +14,8 @@ export const DETECT_DEFAULTS: DetectSettings = sanitizeDetect({
   // Measured on 60 uploaded photos: 2x the plates found (portrait 109 -> 267).
   tileSize: 800,
   tileOverlap: 0.3,
+  // Plates past ~30° of tilt are mostly missed; ±35° covers up to ~60°.
+  tiltAngle: 35,
 })!;
 
 // Read on every detect call; a short cache keeps that off the database.

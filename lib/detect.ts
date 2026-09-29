@@ -14,13 +14,22 @@ async function runModel(file: Blob, model: string, s: DetectSettings): Promise<C
   form.append("overlap", String(s.tileOverlap));
   form.append("aspect_min", String(s.aspectMin));
   form.append("aspect_max", String(s.aspectMax));
+  form.append("tilt", String(s.tiltAngle));
   try {
     const res = await cropFetch("/crops", { method: "POST", body: form, signal: AbortSignal.timeout(30_000) });
-    const data = (await res.json().catch(() => ({}))) as { crops?: { box?: number[]; conf?: number }[] };
+    const data = (await res.json().catch(() => ({}))) as {
+      crops?: { box?: number[]; conf?: number; angle?: number; size?: number[] }[];
+    };
     if (!res.ok || !data.crops) throw new Error(`crop service ${res.status}`);
     const raw = data.crops
       .filter((c) => c.box?.length === 4)
-      .map((c): RawBox => ({ box: c.box as RawBox["box"], conf: c.conf ?? 0 }));
+      .map(
+        (c): RawBox => ({
+          box: c.box as RawBox["box"],
+          conf: c.conf ?? 0,
+          ...(c.angle && c.size?.length === 2 ? { angle: c.angle, size: c.size as [number, number] } : {}),
+        }),
+      );
     // On photos of many plates detectors also box whole rows; those are far wider than any plate.
     return { model, raw, boxes: raw.filter((b) => plateShaped(b, s)) };
   } catch (err) {
