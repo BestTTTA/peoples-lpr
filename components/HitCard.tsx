@@ -1,4 +1,6 @@
 "use client";
+import { useState } from "react";
+import PhotoViewer from "@/components/PhotoViewer";
 import PlateBadge from "@/components/PlateBadge";
 import { RecencyBadge, timeAgo } from "@/components/ReportCard";
 import type { SearchHit } from "@/lib/types";
@@ -7,6 +9,7 @@ import type { SearchHit } from "@/lib/types";
 export default function HitCard({ hit, active, onShow }: { hit: SearchHit; active: boolean; onShow: () => void }) {
   const { plate, report } = hit;
   const photo = report.photos[plate.photo];
+  const [viewing, setViewing] = useState<string | null>(null);
   return (
     <article className={`flex flex-col gap-2 rounded-lg p-2 transition ${active ? "bg-surface-2" : ""}`}>
       <button type="button" onClick={onShow} className="flex items-center gap-3 text-left">
@@ -54,11 +57,12 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
           นำทาง
         </a>
         {photo && (
-          <a className="btn-ghost px-3 py-1.5 text-sm" href={`/api/files/${photo}`} target="_blank" rel="noreferrer">
+          <button type="button" className="btn-ghost px-3 py-1.5 text-sm" onClick={() => setViewing(`/api/files/${photo}`)}>
             รูปเต็ม
-          </a>
+          </button>
         )}
       </div>
+      {viewing && <PhotoViewer src={viewing} alt="รูปที่ผู้แจ้งถ่ายไว้" onClose={() => setViewing(null)} />}
     </article>
   );
 }
