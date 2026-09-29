@@ -103,3 +103,24 @@ is not linked from the site and is excluded from robots.
   volume; the web app reaches its model API with `CROP_ADMIN_TOKEN`.
 
 A `.pt` file runs code when loaded, so only upload models from trusted sources.
+
+## Training the plate detector (`training/`)
+
+Finders' reports are the training data: each plate crop is found again in its
+photo by template matching (crops are cut 1:1 with 2% padding), giving boxes a
+person drew or accepted. Copies of the same photo across reports are merged.
+
+On spark (GPU), in a work folder next to the checkout:
+
+```bash
+# reports + plates from the database
+psql ... > reports.json            # see training/build_dataset.py docstring
+python3 build_dataset.py reports.json http://127.0.0.1:3300 ds   # photos via the web container
+python3 train.py ds/data.yaml koushim.pt runs                    # fine-tune (base: docker cp peoples-lpr-crop:/models/best.pt)
+python3 evaluate.py ds koushim=koushim.pt finetuned=runs/.../best.pt
+```
+
+Then upload the new `best.pt` on `/admin` and select it.
+
+First run (29 Sep 2026): 151 photos / 2,414 plates; held out 30 photos / 325
+plates. Recall 81% -> 97.5%, mAP50 0.55 -> 0.985 against the Koushim base.
