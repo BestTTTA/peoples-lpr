@@ -17,7 +17,8 @@ import { addWatch, removeWatch, useWatches } from "@/lib/watches";
 
 type Results = { exact: SearchHit[]; near: SearchHit[] };
 
-const LIST_LIMIT = 100;
+/** Spots listed at first, and how many more each "ดูเพิ่มเติม" shows. */
+const LIST_STEP = 10;
 const WELCOMED = "peoples-lpr:welcomed";
 
 function FunnelIcon() {
@@ -45,6 +46,7 @@ export default function FindView({
   const [panelOpen, setPanelOpen] = useState(true);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterProvince, setFilterProvince] = useState("");
+  const [listShown, setListShown] = useState(LIST_STEP);
   const [prefix, setPrefix] = useState(initialSearch?.prefix ?? "");
   const [number, setNumber] = useState(initialSearch?.number ?? "");
   const [province, setProvince] = useState(initialSearch?.province ?? "");
@@ -100,7 +102,10 @@ export default function FindView({
     setFocus({ lat: r.lat, lng: r.lng, reportIds: [id] });
     if (scroll) {
       setPanelOpen(true);
-      const spotId = spots.find((s) => s.reportIds.includes(id))?.id ?? id;
+      const index = spots.findIndex((s) => s.reportIds.includes(id));
+      const spotId = spots[index]?.id ?? id;
+      // A pin further down than the list shows: show enough to reach its card.
+      if (index >= listShown) setListShown(Math.ceil((index + 1) / LIST_STEP) * LIST_STEP);
       requestAnimationFrame(() =>
         cardRefs.current.get(spotId)?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
       );
@@ -222,9 +227,20 @@ export default function FindView({
               <div className="rounded-xl border border-line bg-surface-2/60 p-3">
                 <div className="mb-1.5 text-sm font-medium">กรองจุดตามจังหวัดของป้าย</div>
                 <div className="flex gap-2">
-                  <ProvinceInput className="flex-1" value={filterProvince} onChange={setFilterProvince} emptyLabel="ทุกจังหวัด" />
+                  <ProvinceInput
+                    className="flex-1"
+                    value={filterProvince}
+                    onChange={(v) => {
+                      setFilterProvince(v);
+                      setListShown(LIST_STEP);
+                    }}
+                    emptyLabel="ทุกจังหวัด"
+                  />
                   {filterProvince && (
-                    <button type="button" className="btn-ghost px-3" onClick={() => setFilterProvince("")}>
+                    <button type="button" className="btn-ghost px-3" onClick={() => {
+                        setFilterProvince("");
+                        setListShown(LIST_STEP);
+                      }}>
                       ล้าง
                     </button>
                   )}
@@ -344,7 +360,7 @@ export default function FindView({
                     {filterProvince ? `ยังไม่มีผู้แจ้งพบป้ายจังหวัด${filterProvince}` : "ยังไม่มีผู้แจ้งพบป้าย"}
                   </p>
                 )}
-                {spots.slice(0, LIST_LIMIT).map((r) => (
+                {spots.slice(0, listShown).map((r) => (
                   <div
                     key={r.id}
                     ref={(el) => {
@@ -359,6 +375,15 @@ export default function FindView({
                     />
                   </div>
                 ))}
+                {spots.length > listShown && (
+                  <button
+                    type="button"
+                    className="btn-ghost mt-2 w-full"
+                    onClick={() => setListShown((n) => n + LIST_STEP)}
+                  >
+                    ดูเพิ่มเติม ({Math.min(LIST_STEP, spots.length - listShown)} จาก {spots.length - listShown} จุดที่เหลือ)
+                  </button>
+                )}
               </section>
             )}
 
