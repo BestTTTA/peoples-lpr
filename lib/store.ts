@@ -214,10 +214,12 @@ export async function deletePlate(reportId: string, plateId: string): Promise<"p
   return "plate";
 }
 
-export async function saveFile(name: string, data: Uint8Array): Promise<void> {
-  await s3().send(
-    new PutObjectCommand({ Bucket: bucket(), Key: name, Body: data, ContentType: "image/jpeg" }),
-  );
+export async function saveFile(name: string, data: Uint8Array, contentType = "image/jpeg"): Promise<void> {
+  await s3().send(new PutObjectCommand({ Bucket: bucket(), Key: name, Body: data, ContentType: contentType }));
+}
+
+export async function removeFile(name: string): Promise<void> {
+  await deleteFiles([name]);
 }
 
 /** Image bytes for /api/files, or null if there is no such object. */

@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import ContactSettings from "@/components/admin/ContactSettings";
+import LogoEditor from "@/components/admin/LogoEditor";
 import ReportManager from "@/components/admin/ReportManager";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -40,7 +41,7 @@ export default function AdminPanel() {
   const [models, setModels] = useState<Model[] | null>(null);
   const [choice, setChoice] = useState<ModelChoice | null>(null);
   const [modelsError, setModelsError] = useState("");
-  const [tab, setTab] = useState<"reports" | "ai" | "contact">("reports");
+  const [tab, setTab] = useState<"reports" | "ai" | "contact" | "brand">("reports");
 
   const loadModels = useCallback(() => {
     api<{ models: Model[]; choice: ModelChoice }>("/api/admin/models")
@@ -72,12 +73,13 @@ export default function AdminPanel() {
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-2 p-1" role="tablist">
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1 sm:grid-cols-4" role="tablist">
         {(
           [
             ["reports", "เคสที่แจ้ง"],
             ["ai", "AI ครอปป้าย"],
             ["contact", "ช่องทางติดต่อ"],
+            ["brand", "โลโก้"],
           ] as const
         ).map(([k, label]) => (
           <button
@@ -102,6 +104,7 @@ export default function AdminPanel() {
         </>
       )}
       {tab === "contact" && <ContactSettings />}
+      {tab === "brand" && <LogoEditor />}
     </div>
   );
 }

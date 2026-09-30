@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FOUND_PATH, REPORT_PATH } from "@/lib/urls";
@@ -21,7 +20,9 @@ export default function Header() {
     <header className="z-20 border-b border-line bg-surface text-white">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5">
         <Link href="/" className="flex min-w-0 items-center gap-2.5">
-          <Image src="/peoples-lpr-logo.png" alt="" width={40} height={40} className="rounded-full" priority />
+          {/* Plain <img>: the logo can change on /admin, and the image optimizer would keep the old one for hours. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/api/branding/logo" alt="" width={40} height={40} className="h-10 w-10 rounded-full bg-white object-cover" />
           <div className="min-w-0 leading-tight">
             <div className="truncate text-lg font-bold tracking-tight">ตามหาป้ายทะเบียนหาย</div>
             <div className="truncate text-[11px] text-white/60">ป้ายทะเบียนหาย.com · Peoples LPR</div>

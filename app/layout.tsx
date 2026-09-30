@@ -20,6 +20,8 @@ export const metadata: Metadata = {
   title: "ตามหาป้ายทะเบียนหาย — ป้ายทะเบียนหาย.com",
   description,
   applicationName: "ป้ายทะเบียนหาย.com",
+  // Served from settings so an admin can change it on /admin (default: public/brand-logo.png).
+  icons: { icon: { url: "/api/branding/logo", type: "image/png" }, apple: "/api/branding/logo" },
   authors: [{ name: "Thetigerteam Foundation Technology" }],
   creator: "Thetigerteam Foundation Technology",
   openGraph: {
