@@ -1,10 +1,11 @@
 /** Annotated plate showing which part goes in which search field. */
 export default function SearchHint() {
   return (
-    <details className="card group overflow-hidden" open>
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold">
-        <span className="grid h-5 w-5 place-items-center rounded-full bg-brand text-[11px] text-white">?</span>
-        วิธีกรอกข้อมูลค้นหา
+    // Closed by default: help on request, not a wall of text before the form.
+    <details className="group overflow-hidden rounded-xl open:border open:border-line">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-1 py-1.5 text-xs text-ink-3 hover:text-ink group-open:px-4 group-open:py-3 group-open:text-sm group-open:font-semibold group-open:text-ink">
+        <span className="grid h-4 w-4 place-items-center rounded-full border border-current text-[10px]">?</span>
+        กรอกช่องไหนตรงส่วนไหนของป้าย
         <span className="ml-auto text-ink-3 transition group-open:rotate-180">▾</span>
       </summary>
       <div className="border-t border-line px-4 pt-3 pb-4">

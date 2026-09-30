@@ -7,6 +7,7 @@ import ProvinceInput from "@/components/ProvinceInput";
 import HitCard from "@/components/HitCard";
 import ReportCard, { timeAgo } from "@/components/ReportCard";
 import SearchHint from "@/components/SearchHint";
+import WelcomeChooser from "@/components/WelcomeChooser";
 import { clean, isValidNumber, isValidPrefix } from "@/lib/plate";
 import { RECENCY } from "@/lib/recency";
 import { toSpots } from "@/lib/spots";
@@ -17,6 +18,7 @@ import { addWatch, removeWatch, useWatches } from "@/lib/watches";
 type Results = { exact: SearchHit[]; near: SearchHit[] };
 
 const LIST_LIMIT = 100;
+const WELCOMED = "peoples-lpr:welcomed";
 
 function FunnelIcon() {
   return (
@@ -53,6 +55,27 @@ export default function FindView({
   /** The popup announcing a search outcome; closed by the finder. */
   const [popup, setPopup] = useState<(Results & { query: PlateQuery }) | null>(null);
   const cardRefs = useRef(new Map<string, HTMLElement>());
+  const prefixInput = useRef<HTMLInputElement>(null);
+  /** "What are you here for?" on arriving at the home page, once per visit. */
+  const [welcome, setWelcome] = useState(false);
+
+  useEffect(() => {
+    if (initialSearch || initialReport) return; // came with a purpose (a search or report link)
+    let seen = false;
+    try {
+      seen = sessionStorage.getItem(WELCOMED) === "1";
+    } catch {}
+    if (seen) return;
+    const id = requestAnimationFrame(() => setWelcome(true));
+    return () => cancelAnimationFrame(id);
+  }, [initialSearch, initialReport]);
+
+  function closeWelcome() {
+    setWelcome(false);
+    try {
+      sessionStorage.setItem(WELCOMED, "1");
+    } catch {}
+  }
 
 
   const visible = useMemo(
@@ -91,7 +114,7 @@ export default function FindView({
     runSearch({ prefix: clean(prefix), number: clean(number), province });
   }
 
-  async function runSearch(p: PlateQuery) {
+  async function runSearch(p: PlateQuery): Promise<Results | null> {
     setLoading(true);
     setError("");
     // The address bar shows the search, so it can be shared or bookmarked.
@@ -108,8 +131,10 @@ export default function FindView({
         setSelected(hits[0].report.id);
         setFocus({ lat: hits[0].report.lat, lng: hits[0].report.lng, reportIds: hits.map((h) => h.report.id) });
       }
+      return data as Results;
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : "ค้นหาไม่สำเร็จ");
+      return null;
     } finally {
       setLoading(false);
     }
@@ -207,8 +232,6 @@ export default function FindView({
               </div>
             )}
 
-            <SearchHint />
-
             <form onSubmit={search} className="flex flex-col gap-3 rounded-2xl border border-line p-3" noValidate>
               <div className="grid grid-cols-2 gap-2">
                 <label className="text-sm font-medium">
@@ -217,6 +240,7 @@ export default function FindView({
                   </span>
                   <input
                     className={`field ${touched && !prefixOk ? "border-warn" : ""}`}
+                    ref={prefixInput}
                     placeholder="เช่น 3ฒน"
                     value={prefix}
                     maxLength={5}
@@ -260,6 +284,8 @@ export default function FindView({
               </div>
               {error && <p className="text-sm text-red-400">{error}</p>}
             </form>
+
+            <SearchHint />
 
             <WatchList onPick={runSearch} />
 
@@ -339,6 +365,29 @@ export default function FindView({
             <DevCredit className="mt-auto pt-2" />
           </aside>
         </>
+      )}
+
+      {welcome && (
+        <WelcomeChooser
+          onClose={closeWelcome}
+          onSearch={() => {
+            closeWelcome();
+            setPanelOpen(true);
+            requestAnimationFrame(() => {
+              prefixInput.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+              prefixInput.current?.focus();
+            });
+          }}
+          onWatch={async (q) => {
+            closeWelcome();
+            setPrefix(q.prefix);
+            setNumber(q.number);
+            setProvince(q.province);
+            // Found already: the popup shows it. Not yet: keep looking for it.
+            const r = await runSearch(q);
+            if (r && r.exact.length === 0) addWatch(q);
+          }}
+        />
       )}
 
       {popup && (

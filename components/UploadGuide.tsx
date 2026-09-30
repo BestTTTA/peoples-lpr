@@ -71,10 +71,11 @@ const STEPS = [
 
 export default function UploadGuide() {
   return (
-    <details className="card group overflow-hidden" open>
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 font-semibold">
-        <span className="grid h-6 w-6 place-items-center rounded-full bg-brand text-xs text-white">?</span>
-        วิธีแจ้งพบป้ายทะเบียน
+    // Closed by default: the steps below already guide; this is for whoever wants more.
+    <details className="group overflow-hidden rounded-xl open:border open:border-line">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-1 py-1.5 text-sm text-ink-3 hover:text-ink group-open:px-4 group-open:py-3 group-open:font-semibold group-open:text-ink">
+        <span className="grid h-5 w-5 place-items-center rounded-full border border-current text-[11px]">?</span>
+        ดูวิธีถ่ายรูปและตีกรอบให้ได้ผลดี
         <span className="ml-auto text-ink-3 transition group-open:rotate-180">▾</span>
       </summary>
       <div className="grid gap-4 border-t border-line p-4 md:grid-cols-[minmax(0,300px)_1fr]">
