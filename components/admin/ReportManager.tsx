@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import LocationPicker, { type LatLng } from "@/components/LocationPicker";
 import PhotoViewer from "@/components/PhotoViewer";
 import PlateBadge from "@/components/PlateBadge";
 import type { Report } from "@/lib/types";
@@ -21,6 +22,7 @@ export default function ReportManager() {
   const [busy, setBusy] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [viewing, setViewing] = useState<string | null>(null);
+  const [moving, setMoving] = useState<Report | null>(null);
 
   const fetchPage = useCallback(async (q: string, p: number) => {
     setLoading(true);
@@ -146,6 +148,14 @@ export default function ReportManager() {
                   </a>
                   <button
                     type="button"
+                    className="btn-ghost px-3 py-1.5 text-sm"
+                    disabled={!!busy}
+                    onClick={() => setMoving(r)}
+                  >
+                    📍 แก้ตำแหน่ง
+                  </button>
+                  <button
+                    type="button"
                     className="btn-ghost px-3 py-1.5 text-sm text-red-400 hover:border-red-500"
                     disabled={!!busy}
                     onClick={() => removeReport(r)}
@@ -198,6 +208,75 @@ export default function ReportManager() {
         </button>
       )}
       {viewing && <PhotoViewer src={viewing} alt="รูปที่ผู้แจ้งถ่ายไว้" onClose={() => setViewing(null)} />}
+      {moving && (
+        <MoveDialog
+          report={moving}
+          onClose={() => setMoving(null)}
+          onMoved={(m) => {
+            setReports((prev) => prev.map((x) => (x.id === m.id ? { ...x, lat: m.lat, lng: m.lng, place: m.place } : x)));
+            setMoving(null);
+          }}
+        />
+      )}
     </section>
+  );
+}
+
+/** Move a report's pin: search a place, paste a Google Maps link, drag or tap. */
+function MoveDialog({
+  report,
+  onClose,
+  onMoved,
+}: {
+  report: Report;
+  onClose: () => void;
+  onMoved: (m: { id: string; lat: number; lng: number; place: string }) => void;
+}) {
+  const [at, setAt] = useState<LatLng>({ lat: report.lat, lng: report.lng });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const changed = at.lat !== report.lat || at.lng !== report.lng;
+
+  async function save() {
+    setBusy(true);
+    setError("");
+    const res = await fetch(`/api/admin/reports/${report.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(at),
+    }).catch(() => null);
+    const data = await res?.json().catch(() => ({}));
+    setBusy(false);
+    if (!res?.ok) return setError(data?.error ?? "บันทึกไม่สำเร็จ");
+    onMoved(data);
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label="แก้ตำแหน่ง" className="card flex max-h-[92vh] w-full max-w-2xl flex-col gap-3 overflow-y-auto p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="font-bold">แก้ตำแหน่งจุดที่พบ</h3>
+            <p className="truncate text-sm text-ink-3">
+              {report.plates.length} ป้าย · ตอนนี้: {report.place || `${report.lat.toFixed(5)}, ${report.lng.toFixed(5)}`}
+            </p>
+          </div>
+          <button type="button" className="icon-btn shrink-0" aria-label="ปิด" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+        <LocationPicker value={at} onChange={setAt} centerOnValue />
+        {error && <p className="text-sm text-red-400">{error}</p>}
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="btn-primary" disabled={!changed || busy} onClick={save}>
+            {busy ? "กำลังบันทึก…" : "บันทึกตำแหน่งใหม่"}
+          </button>
+          <button type="button" className="btn-ghost" onClick={() => setAt({ lat: report.lat, lng: report.lng })} disabled={!changed}>
+            กลับตำแหน่งเดิม
+          </button>
+          <span className="text-xs text-ink-3">ชื่อสถานที่จะอัปเดตตามตำแหน่งใหม่ให้อัตโนมัติ</span>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -11,9 +11,12 @@ export type LatLng = { lat: number; lng: number };
 export default function LocationPicker({
   value,
   onChange,
+  centerOnValue = false,
 }: {
   value: LatLng | null;
   onChange: (v: LatLng) => void;
+  /** Open on the given pin (editing an existing location) instead of the default view. */
+  centerOnValue?: boolean;
 }) {
   const el = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MLMap | null>(null);
@@ -60,6 +63,14 @@ export default function LocationPicker({
     }
     marker.current.setLngLat([value.lng, value.lat]).addTo(map);
   }, [map, value]);
+
+  // Editing: start looking at the current pin (once, when the map is ready).
+  const centered = useRef(false);
+  useEffect(() => {
+    if (!map || !centerOnValue || !value || centered.current) return;
+    centered.current = true;
+    map.jumpTo({ center: [value.lng, value.lat], zoom: 16 });
+  }, [map, centerOnValue, value]);
 
   async function search(text = query) {
     const q = text.trim();

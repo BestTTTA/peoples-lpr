@@ -151,6 +151,18 @@ async function deleteFiles(names: string[]): Promise<void> {
   if (failed.length) throw new Error(`${failed.length}/${names.length} file deletes failed: ${(failed[0] as PromiseRejectedResult).reason}`);
 }
 
+/** Move a report's pin (and its place name). False if there was no such report. */
+export async function updateReportLocation(id: string, lat: number, lng: number, place: string): Promise<boolean> {
+  await ready();
+  const { rowCount } = await pool().query("UPDATE reports SET lat = $2, lng = $3, place = $4 WHERE id = $1", [
+    id,
+    lat,
+    lng,
+    place,
+  ]);
+  return (rowCount ?? 0) > 0;
+}
+
 /** Remove a report, its plates and all its files. False if there was no such report. */
 export async function deleteReport(id: string): Promise<boolean> {
   await ready();
