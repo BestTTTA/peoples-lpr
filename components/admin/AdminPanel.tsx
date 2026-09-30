@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import ContactSettings from "@/components/admin/ContactSettings";
+import ReportManager from "@/components/admin/ReportManager";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type Candidate,
@@ -39,6 +40,7 @@ export default function AdminPanel() {
   const [models, setModels] = useState<Model[] | null>(null);
   const [choice, setChoice] = useState<ModelChoice | null>(null);
   const [modelsError, setModelsError] = useState("");
+  const [tab, setTab] = useState<"reports" | "ai" | "contact">("reports");
 
   const loadModels = useCallback(() => {
     api<{ models: Model[]; choice: ModelChoice }>("/api/admin/models")
@@ -63,21 +65,43 @@ export default function AdminPanel() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold">ตั้งค่าระบบ</h1>
-          <p className="text-sm text-ink-3">ค่าที่บันทึกมีผลกับการครอปอัตโนมัติของทุกคนภายใน ~10 วินาที</p>
+          <p className="text-sm text-ink-3">สำหรับผู้ดูแลเว็บเท่านั้น</p>
         </div>
         <button type="button" className="btn-ghost shrink-0 px-3 py-1.5 text-sm" onClick={logout}>
           ออกจากระบบ
         </button>
       </div>
-      <Models
-        models={models}
-        choice={choice}
-        error={modelsError}
-        onChanged={loadModels}
-        onChoice={setChoice}
-      />
-      <SettingsAndTest choice={choice} nameOf={nameOf} />
-      <ContactSettings />
+
+      <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-2 p-1" role="tablist">
+        {(
+          [
+            ["reports", "เคสที่แจ้ง"],
+            ["ai", "AI ครอปป้าย"],
+            ["contact", "ช่องทางติดต่อ"],
+          ] as const
+        ).map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            aria-selected={tab === k}
+            onClick={() => setTab(k)}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold ${tab === k ? "bg-brand text-white" : "text-ink-3 hover:text-ink"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "reports" && <ReportManager />}
+      {tab === "ai" && (
+        <>
+          <p className="text-sm text-ink-3">ค่าที่บันทึกมีผลกับการครอปอัตโนมัติของทุกคนภายใน ~10 วินาที</p>
+          <Models models={models} choice={choice} error={modelsError} onChanged={loadModels} onChoice={setChoice} />
+          <SettingsAndTest choice={choice} nameOf={nameOf} />
+        </>
+      )}
+      {tab === "contact" && <ContactSettings />}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import "server-only";
-import { GetObjectCommand, NoSuchKey, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, NoSuchKey, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { Pool } from "pg";
 import type { Plate, Report } from "./types";
 
@@ -139,6 +139,79 @@ export async function addReport(report: Report): Promise<void> {
   } finally {
     client.release();
   }
+}
+
+// One request per file: this MinIO release rejects the SDK's batch delete
+// (DeleteObjects without Content-MD5, which current SDKs no longer send).
+async function deleteFiles(names: string[]): Promise<void> {
+  const results = await Promise.allSettled(
+    names.map((Key) => s3().send(new DeleteObjectCommand({ Bucket: bucket(), Key }))),
+  );
+  const failed = results.filter((r) => r.status === "rejected");
+  if (failed.length) throw new Error(`${failed.length}/${names.length} file deletes failed: ${(failed[0] as PromiseRejectedResult).reason}`);
+}
+
+/** Remove a report, its plates and all its files. False if there was no such report. */
+export async function deleteReport(id: string): Promise<boolean> {
+  await ready();
+  const client = await pool().connect();
+  let files: string[];
+  try {
+    await client.query("BEGIN");
+    const r = await client.query<{ photos: string[] }>("SELECT photos FROM reports WHERE id = $1 FOR UPDATE", [id]);
+    if (!r.rows.length) {
+      await client.query("ROLLBACK");
+      return false;
+    }
+    const p = await client.query<{ crop: string }>("SELECT crop FROM plates WHERE report_id = $1", [id]);
+    await client.query("DELETE FROM reports WHERE id = $1", [id]); // plates go by ON DELETE CASCADE
+    await client.query("COMMIT");
+    files = [...r.rows[0].photos, ...p.rows.map((x) => x.crop)];
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+  // Rows first: a failed file delete leaves an orphan file, never a report with a missing photo.
+  await deleteFiles(files).catch((err) => console.error("delete files", err));
+  return true;
+}
+
+/**
+ * Remove one plate from a report (a single wrong reading among many). Removing
+ * the last plate removes the report. Returns what happened.
+ */
+export async function deletePlate(reportId: string, plateId: string): Promise<"plate" | "report" | "missing"> {
+  await ready();
+  const client = await pool().connect();
+  let crop: string;
+  try {
+    await client.query("BEGIN");
+    const del = await client.query<{ crop: string }>(
+      "DELETE FROM plates WHERE id = $1 AND report_id = $2 RETURNING crop",
+      [plateId, reportId],
+    );
+    if (!del.rows.length) {
+      await client.query("ROLLBACK");
+      return "missing";
+    }
+    crop = del.rows[0].crop;
+    const left = await client.query("SELECT 1 FROM plates WHERE report_id = $1 LIMIT 1", [reportId]);
+    await client.query("COMMIT");
+    if (!left.rows.length) {
+      await deleteReport(reportId);
+      await deleteFiles([crop]).catch(() => {});
+      return "report";
+    }
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+  await deleteFiles([crop]).catch((err) => console.error("delete files", err));
+  return "plate";
 }
 
 export async function saveFile(name: string, data: Uint8Array): Promise<void> {
