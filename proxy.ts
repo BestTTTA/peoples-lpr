@@ -56,9 +56,11 @@ export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isApi = path.startsWith("/api/");
 
-  // Requests from the server itself (the deploy health check on 127.0.0.1)
-  // never pass through Cloudflare, so the port is only reachable locally.
-  if (!DEV && LOOPBACK.test(host)) return NextResponse.next();
+  // Only Cloudflare-forwarded requests are visitors (the port listens on
+  // 127.0.0.1 only, and Cloudflare always adds cf-ray). Anything else is the
+  // server itself: the deploy health check, or Next fetching a public file for
+  // the image optimizer, which arrives under an internal host name.
+  if (!DEV && !headers.get("cf-ray")) return NextResponse.next();
 
   if (!allowedHost(host)) {
     if (isApi) return refuse(request, host, "host");
