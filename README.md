@@ -127,3 +127,8 @@ Then upload the new `best.pt` on `/admin` and select it.
 
 First run (29 Sep 2026): 151 photos / 2,414 plates; held out 30 photos / 325
 plates. Recall 81% -> 97.5%, mAP50 0.55 -> 0.985 against the Koushim base.
+
+Second run (1 Oct 2026): 403 photos / 5,820 plates, fine-tuned from the first
+model, previous split kept; held out 80 photos / 1,270 plates. At conf 0.25:
+recall Koushim 60.3%, v1 97.7%, v2 98.1%; wrong boxes v1 197, v2 189;
+mAP50 0.43 / 0.959 / 0.971. Stopped early at epoch 67 (37 min on the GB10).
