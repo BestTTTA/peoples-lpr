@@ -24,13 +24,25 @@ const plateShapedPhoto = (p: { width: number; height: number }) => {
   return r >= 1.6 && r <= 5;
 };
 
-type Photo = { id: string; blob: Blob; url: string; width: number; height: number; boxes: Box[]; scan?: Scan };
+type Photo = {
+  id: string;
+  blob: Blob;
+  url: string;
+  width: number;
+  height: number;
+  boxes: Box[];
+  scan?: Scan;
+  /** AI boxes the finder deleted: kept with the report as "not a plate" training data. */
+  rejected?: Box[];
+};
 
 type CropMode = "auto" | "manual";
 
 type Draft = {
   key: string;
   photo: number;
+  /** Where the plate is in its photo (sent along as training data). */
+  box: Box;
   crop: Blob;
   cropUrl: string;
   prefix: string;
@@ -92,7 +104,7 @@ export default function ReportFlow() {
       let found = await detectPlates(p);
       let scan: Scan = found.length ? "found" : "none";
       if (!found.length && plateShapedPhoto(p)) {
-        found = [{ x: 0, y: 0, w: 1, h: 1 }];
+        found = [{ x: 0, y: 0, w: 1, h: 1, source: "whole" }];
         scan = "whole";
       }
       setPhotos((prev) =>
@@ -136,6 +148,17 @@ export default function ReportFlow() {
     setPhotos((prev) => prev.map((p, j) => (j === i ? { ...p, boxes } : p)));
   }
 
+  /** The finder changed the boxes: AI boxes they removed are remembered as rejected. */
+  function editBoxes(i: number, boxes: Box[]) {
+    setPhotos((prev) =>
+      prev.map((p, j) => {
+        if (j !== i) return p;
+        const removed = p.boxes.filter((b) => b.source === "ai" && !boxes.includes(b));
+        return { ...p, boxes, rejected: [...(p.rejected ?? []), ...removed] };
+      }),
+    );
+  }
+
   /** Turn the photo 90° clockwise; drawn boxes turn with it. In AI mode, look again (upright plates detect better). */
   async function rotate(i: number) {
     const p = photos[i];
@@ -144,9 +167,17 @@ export default function ReportFlow() {
     try {
       const r = await rotatePhoto(p.blob);
       URL.revokeObjectURL(p.url);
-      const turned: Photo = { ...p, ...r, url: URL.createObjectURL(r.blob), boxes: p.boxes.map(rotateBox) };
+      const turned: Photo = {
+        ...p,
+        ...r,
+        url: URL.createObjectURL(r.blob),
+        boxes: p.boxes.map(rotateBox),
+        rejected: (p.rejected ?? []).map(rotateBox),
+      };
       if (mode === "auto") {
+        // A fresh look at the turned photo; earlier AI boxes no longer apply.
         turned.boxes = [];
+        turned.rejected = [];
         turned.scan = undefined;
       }
       setPhotos((prev) => prev.map((q) => (q.id === p.id ? turned : q)));
@@ -179,6 +210,7 @@ export default function ReportFlow() {
         next.push({
           key: crypto.randomUUID(),
           photo: pi,
+          box: b,
           crop,
           cropUrl: URL.createObjectURL(crop),
           prefix: "",
@@ -274,7 +306,17 @@ export default function ReportFlow() {
           number: clean(d.number),
           province: d.province,
           photo: used.indexOf(d.photo),
+          box: storedBox(d.box),
         })),
+        // Training data for the plate detector: plates boxed but left out, and AI boxes deleted.
+        extraBoxes: [
+          ...drafts
+            .filter((d) => d.skipped && used.includes(d.photo))
+            .map((d) => ({ ...storedBox(d.box), photo: used.indexOf(d.photo), kind: "skipped" })),
+          ...used.flatMap((pi, i) =>
+            (photos[pi].rejected ?? []).map((b) => ({ ...storedBox(b), photo: i, kind: "rejected" })),
+          ),
+        ],
       }),
     );
     used.forEach((i) => form.append("photo", photos[i].blob, "photo.jpg"));
@@ -456,12 +498,12 @@ export default function ReportFlow() {
                 <button
                   type="button"
                   className="btn-ghost px-3 py-1.5 text-sm"
-                  onClick={() => setBoxes(active, [...current.boxes, { x: 0, y: 0, w: 1, h: 1 }])}
+                  onClick={() => setBoxes(active, [...current.boxes, { x: 0, y: 0, w: 1, h: 1, source: "whole" }])}
                 >
                   ทั้งรูปคือ 1 ป้าย
                 </button>
                 {current.boxes.length > 0 && (
-                  <button type="button" className="btn-ghost px-3 py-1.5 text-sm" onClick={() => setBoxes(active, [])}>
+                  <button type="button" className="btn-ghost px-3 py-1.5 text-sm" onClick={() => editBoxes(active, [])}>
                     ล้างกรอบในรูปนี้
                   </button>
                 )}
@@ -475,7 +517,7 @@ export default function ReportFlow() {
                   height={current.height}
                   boxes={current.boxes}
                   numberOffset={offset}
-                  onChange={(b) => setBoxes(active, b)}
+                  onChange={(b) => editBoxes(active, b)}
                 />
               )}
             </>
@@ -737,4 +779,17 @@ export default function ReportFlow() {
       </div>
     </div>
   );
+}
+
+/** A box as kept with the report (lib/boxes StoredBox). */
+function storedBox(b: Box) {
+  return {
+    x: b.x,
+    y: b.y,
+    w: b.w,
+    h: b.h,
+    source: b.source ?? "manual",
+    ...(b.conf !== undefined ? { conf: b.conf } : {}),
+    ...(b.rot ? { angle: b.rot.angle, pw: b.rot.w, ph: b.rot.h } : {}),
+  };
 }

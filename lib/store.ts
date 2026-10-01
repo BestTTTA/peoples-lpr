@@ -1,6 +1,7 @@
 import "server-only";
 import { DeleteObjectCommand, GetObjectCommand, NoSuchKey, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { Pool } from "pg";
+import type { ExtraBox } from "./boxes";
 import type { Plate, Report } from "./types";
 
 // Reports live in Postgres, photos and plate crops in MinIO (S3 API).
@@ -14,7 +15,7 @@ function env(name: string): string {
 
 // One pool per server process; survive dev hot reloads. (Bump the schema key
 // when ready() gains tables, so a running dev server runs it again.)
-const g = globalThis as unknown as { lprPool?: Pool; lprS3?: S3Client; lprSchemaV2?: Promise<void> };
+const g = globalThis as unknown as { lprPool?: Pool; lprS3?: S3Client; lprSchemaV3?: Promise<void> };
 
 function pool(): Pool {
   g.lprPool ??= new Pool({ connectionString: env("DATABASE_URL"), max: 5 });
@@ -35,7 +36,7 @@ const bucket = () => env("S3_BUCKET");
 
 /** Idempotent schema setup, run once per process before the first query. */
 function ready(): Promise<void> {
-  g.lprSchemaV2 ??= pool()
+  g.lprSchemaV3 ??= pool()
     .query(
       `CREATE TABLE IF NOT EXISTS reports (
          id          uuid PRIMARY KEY,
@@ -58,6 +59,8 @@ function ready(): Promise<void> {
          photo      int  NOT NULL
        );
        CREATE INDEX IF NOT EXISTS plates_report_idx ON plates (report_id);
+       ALTER TABLE plates ADD COLUMN IF NOT EXISTS box jsonb;
+       ALTER TABLE reports ADD COLUMN IF NOT EXISTS extra_boxes jsonb NOT NULL DEFAULT '[]';
        CREATE INDEX IF NOT EXISTS plates_lookup_idx ON plates (province, prefix, number);
        CREATE TABLE IF NOT EXISTS settings (
          key         text PRIMARY KEY,
@@ -67,10 +70,10 @@ function ready(): Promise<void> {
     )
     .then(() => undefined)
     .catch((err) => {
-      g.lprSchemaV2 = undefined; // retry on the next request
+      g.lprSchemaV3 = undefined; // retry on the next request
       throw err;
     });
-  return g.lprSchemaV2;
+  return g.lprSchemaV3;
 }
 
 type Row = {
@@ -82,6 +85,7 @@ type Row = {
   note: string;
   contact: string;
   photos: string[];
+  extra_boxes: ExtraBox[] | null;
   plates: (Plate & { position: number })[] | null;
 };
 
@@ -91,7 +95,7 @@ export async function listReports(): Promise<Report[]> {
     `SELECT r.*,
             (SELECT json_agg(json_build_object(
                       'id', p.id, 'prefix', p.prefix, 'number', p.number, 'province', p.province,
-                      'crop', p.crop, 'photo', p.photo, 'position', p.position) ORDER BY p.position)
+                      'crop', p.crop, 'photo', p.photo, 'box', p.box, 'position', p.position) ORDER BY p.position)
                FROM plates p WHERE p.report_id = r.id) AS plates
        FROM reports r
       ORDER BY r.created_at DESC`,
@@ -105,6 +109,7 @@ export async function listReports(): Promise<Report[]> {
     note: r.note,
     contact: r.contact,
     photos: r.photos,
+    extraBoxes: r.extra_boxes ?? [],
     plates: (r.plates ?? []).map((p) => ({
       id: p.id,
       prefix: p.prefix,
@@ -112,6 +117,7 @@ export async function listReports(): Promise<Report[]> {
       province: p.province,
       crop: p.crop,
       photo: p.photo,
+      box: p.box ?? null,
     })),
   }));
 }
@@ -122,15 +128,25 @@ export async function addReport(report: Report): Promise<void> {
   try {
     await client.query("BEGIN");
     await client.query(
-      `INSERT INTO reports (id, created_at, lat, lng, place, note, contact, photos)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [report.id, report.createdAt, report.lat, report.lng, report.place ?? "", report.note, report.contact, report.photos],
+      `INSERT INTO reports (id, created_at, lat, lng, place, note, contact, photos, extra_boxes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        report.id,
+        report.createdAt,
+        report.lat,
+        report.lng,
+        report.place ?? "",
+        report.note,
+        report.contact,
+        report.photos,
+        JSON.stringify(report.extraBoxes ?? []),
+      ],
     );
     for (const [i, p] of report.plates.entries())
       await client.query(
-        `INSERT INTO plates (id, report_id, position, prefix, number, province, crop, photo)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [p.id, report.id, i, p.prefix, p.number, p.province, p.crop, p.photo],
+        `INSERT INTO plates (id, report_id, position, prefix, number, province, crop, photo, box)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [p.id, report.id, i, p.prefix, p.number, p.province, p.crop, p.photo, p.box ? JSON.stringify(p.box) : null],
       );
     await client.query("COMMIT");
   } catch (err) {

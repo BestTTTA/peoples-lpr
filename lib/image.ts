@@ -13,6 +13,10 @@ export type Box = {
    * The crop is levelled, which OCR reads far better.
    */
   rot?: { angle: number; w: number; h: number };
+  /** Who made the box (kept with the report as training data); absent = drawn by hand. */
+  source?: "ai" | "manual" | "whole";
+  /** AI confidence, for AI boxes. */
+  conf?: number;
 };
 
 const MAX_EDGE = 2000;
@@ -77,11 +81,13 @@ export async function detectPlates(photo: { blob: Blob; width: number; height: n
   const form = new FormData();
   form.append("file", photo.blob, "photo.jpg");
   const { boxes } = await postForm<{
-    boxes: { box: [number, number, number, number]; angle?: number; size?: [number, number] }[];
+    boxes: { box: [number, number, number, number]; conf?: number; angle?: number; size?: [number, number] }[];
   }>("/api/detect", form);
   const clamp = (v: number) => Math.min(1, Math.max(0, v));
   return boxes
-    .map(({ box: [x1, y1, x2, y2], angle, size }): Box => ({
+    .map(({ box: [x1, y1, x2, y2], conf, angle, size }): Box => ({
+      source: "ai",
+      ...(conf !== undefined ? { conf } : {}),
       x: clamp(x1 / photo.width),
       y: clamp(y1 / photo.height),
       w: clamp((x2 - x1) / photo.width),
@@ -108,4 +114,11 @@ export async function rotatePhoto(photo: Blob): Promise<{ blob: Blob; width: num
 }
 
 /** Where a box lands when its photo turns 90° clockwise (normalized coordinates). */
-export const rotateBox = (b: Box): Box => ({ x: 1 - (b.y + b.h), y: b.x, w: b.h, h: b.w });
+export const rotateBox = (b: Box): Box => ({
+  x: 1 - (b.y + b.h),
+  y: b.x,
+  w: b.h,
+  h: b.w,
+  ...(b.source ? { source: b.source } : {}),
+  ...(b.conf !== undefined ? { conf: b.conf } : {}),
+});

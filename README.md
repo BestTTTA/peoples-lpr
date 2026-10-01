@@ -106,16 +106,19 @@ A `.pt` file runs code when loaded, so only upload models from trusted sources.
 
 ## Training the plate detector (`training/`)
 
-Finders' reports are the training data: each plate crop is found again in its
-photo by template matching (crops are cut 1:1 with 2% padding), giving boxes a
-person drew or accepted. Copies of the same photo across reports are merged.
+Finders' reports are the training data. Since 1 Oct 2026 each plate's box in its
+photo is stored (`plates.box`: position, source ai/manual/whole, AI confidence,
+tilt), with AI boxes the finder deleted and plates left out as unreadable in
+`reports.extra_boxes`. For older reports each crop is found again in its photo
+by template matching (crops are cut 1:1 with 2% padding). Either way the boxes
+were drawn or accepted by a person. Copies of the same photo are merged.
 
 On spark (GPU), in a work folder next to the checkout:
 
 ```bash
 # reports + plates from the database
-psql ... > reports.json            # see training/build_dataset.py docstring
-python3 build_dataset.py reports.json http://127.0.0.1:3300 ds   # photos via the web container
+docker exec -i facefinder-postgres psql -U facefinder -d peoples_lpr -At < export_reports.sql > reports.json
+python3 build_dataset.py reports.json http://127.0.0.1:3300 ds [old/split.json]   # photos via the web container
 python3 train.py ds/data.yaml koushim.pt runs                    # fine-tune (base: docker cp peoples-lpr-crop:/models/best.pt)
 python3 evaluate.py ds koushim=koushim.pt finetuned=runs/.../best.pt
 ```

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { sanitizeBox, sanitizeExtraBoxes } from "@/lib/boxes";
 import { MAX_PLATES } from "@/lib/limits";
 import { clean, isValidNumber, isValidPrefix } from "@/lib/plate";
 import { isProvince } from "@/lib/provinces";
@@ -28,7 +29,9 @@ type Meta = {
   lng: number;
   note?: string;
   contact?: string;
-  plates: { prefix: string; number: string; province: string; photo: number }[];
+  plates: { prefix: string; number: string; province: string; photo: number; box?: unknown }[];
+  /** AI boxes the finder deleted, plates boxed but left out: training data. */
+  extraBoxes?: unknown;
 };
 
 function bad(msg: string) {
@@ -86,6 +89,8 @@ export async function POST(request: Request) {
       province: p.province,
       crop: name,
       photo: p.photo,
+      // Where it is in the photo, for training the detector; a bad box is dropped, not an error.
+      box: sanitizeBox(p.box),
     });
   }
 
@@ -99,6 +104,7 @@ export async function POST(request: Request) {
     contact: String(meta.contact ?? "").slice(0, 200),
     photos: photoNames,
     plates,
+    extraBoxes: sanitizeExtraBoxes(meta.extraBoxes, photoNames.length),
   };
   await addReport(report);
   return Response.json({ id: report.id }, { status: 201 });

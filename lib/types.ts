@@ -1,3 +1,5 @@
+import type { ExtraBox, StoredBox } from "./boxes";
+
 export type Plate = {
   id: string;
   /** Leading part: optional digit + 1–2 Thai letters, e.g. "กพ", "3ฒน". */
@@ -9,6 +11,8 @@ export type Plate = {
   crop: string;
   /** Index into Report.photos of the photo this crop came from. */
   photo: number;
+  /** Where in that photo (training data); null for reports from before it was kept. */
+  box?: StoredBox | null;
 };
 
 export type Report = {
@@ -23,6 +27,8 @@ export type Report = {
   contact: string;
   photos: string[];
   plates: Plate[];
+  /** AI boxes the finder deleted and plates boxed but left out (training data). */
+  extraBoxes?: ExtraBox[];
 };
 
 /** What the public map and dashboard get: plate text, but no photos and no contact. */

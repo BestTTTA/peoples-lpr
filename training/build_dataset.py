@@ -1,16 +1,21 @@
 """Build a YOLO plate-detection dataset from what finders reported.
 
-The app keeps each report's photos and one crop per plate, but not where the
-crop came from. Crops are cut straight out of the stored photo (padded 2% per
-side, scaled down only if wider/taller than 800 px), so template matching finds
-the box again almost exactly. Those boxes were drawn or accepted by a person.
+Since 1 Oct 2026 the app stores each plate's box in its photo (plates.box), plus
+plates boxed but left out as unreadable (reports.extra_boxes, kind "skipped"),
+which count as plates here too. Older reports only have the crop: crops are cut
+straight out of the stored photo (padded 2% per side, scaled down only if
+wider/taller than 800 px), so template matching finds the box again almost
+exactly. Either way the boxes were drawn or accepted by a person.
 
 The same photo is often sent in several reports, each with some of its plates
 boxed; copies are grouped (same size + perceptual hash) and their boxes merged.
 Groups are split train/val so no photo leaks from one to the other. Training
 images also get the 800 px overlapping tiles crop-service searches at run time.
 
-    python3 build_dataset.py reports.json http://127.0.0.1:3300 out/
+    python3 build_dataset.py reports.json http://127.0.0.1:3300 out/ [previous/split.json]
+
+With a previous split, photos keep their side (train/val) so the old model is
+never scored on photos it trained on; only new photos are split afresh.
 """
 
 import hashlib
@@ -71,6 +76,17 @@ def locate(photo: np.ndarray, crop: np.ndarray) -> tuple[list[float], float] | N
     return [x1, y1, x2, y2], score
 
 
+def stored_box(b: dict, W: int, H: int) -> list[float] | None:
+    """A box the app stored (fractions of the photo) in pixels; tilted ones as their upright bounds."""
+    try:
+        x1, y1 = b["x"] * W, b["y"] * H
+        x2, y2 = (b["x"] + b["w"]) * W, (b["y"] + b["h"]) * H
+    except (KeyError, TypeError):
+        return None
+    x1, y1, x2, y2 = max(0, x1), max(0, y1), min(W, x2), min(H, y2)
+    return [x1, y1, x2, y2] if x2 - x1 > 2 and y2 - y1 > 2 else None
+
+
 def phash(img: np.ndarray) -> str:
     g = cv2.resize(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), (16, 16), interpolation=cv2.INTER_AREA)
     return hashlib.md5((g > g.mean()).tobytes()).hexdigest()
@@ -103,12 +119,13 @@ def tiles(W, H):
 
 def main():
     reports_path, base, out = sys.argv[1], sys.argv[2].rstrip("/"), Path(sys.argv[3])
+    prev_split = json.load(open(sys.argv[4])) if len(sys.argv) > 4 else {}
     cache = out / "cache"
     cache.mkdir(parents=True, exist_ok=True)
     reports = json.load(open(reports_path, encoding="utf-8"))
 
     groups: dict[str, dict] = {}
-    stats = {"plates": 0, "matched": 0, "photo_missing": 0, "no_match": 0}
+    stats = {"plates": 0, "stored_box": 0, "matched": 0, "skipped_boxes": 0, "photo_missing": 0, "no_match": 0}
     for r in reports:
         photos = [fetch(base, n, cache) for n in r["photos"]]
         for i, name in enumerate(r["photos"]):
@@ -123,20 +140,36 @@ def main():
                 if p["photo"] != i:
                     continue
                 stats["plates"] += 1
-                crop = fetch(base, p["crop"], cache)
-                hit = locate(img, crop) if crop is not None else None
-                if not hit:
-                    stats["no_match"] += 1
-                    continue
-                stats["matched"] += 1
-                box, _ = hit
+                box = stored_box(p["box"], W, H) if p.get("box") else None
+                if box:
+                    stats["stored_box"] += 1
+                else:
+                    crop = fetch(base, p["crop"], cache)
+                    hit = locate(img, crop) if crop is not None else None
+                    if not hit:
+                        stats["no_match"] += 1
+                        continue
+                    stats["matched"] += 1
+                    box, _ = hit
                 if all(iou(box, b) < 0.5 for b in g["boxes"]):  # same plate boxed in another report
                     g["boxes"].append(box)
+            # Plates boxed but left out of the report (unreadable) are still plates.
+            for e in r.get("extra") or []:
+                if e.get("kind") != "skipped" or e.get("photo") != i:
+                    continue
+                box = stored_box(e, W, H)
+                if box and all(iou(box, b) < 0.5 for b in g["boxes"]):
+                    g["boxes"].append(box)
+                    stats["skipped_boxes"] += 1
 
     keys = sorted(k for k, g in groups.items() if g["boxes"])
-    random.Random(0).shuffle(keys)
-    n_val = max(1, round(len(keys) * VAL_SHARE))
-    split = {k: ("val" if i < n_val else "train") for i, k in enumerate(keys)}
+    # Photos from the previous run keep their side; new ones are split afresh.
+    split = {k: prev_split[k] for k in keys if k in prev_split}
+    fresh = [k for k in keys if k not in split]
+    random.Random(0).shuffle(fresh)
+    n_new_val = round(len(fresh) * VAL_SHARE)
+    split.update({k: ("val" if i < n_new_val else "train") for i, k in enumerate(fresh)})
+    n_val = sum(1 for k in keys if split[k] == "val")
 
     counts = {"train": [0, 0], "val": [0, 0]}
     for k in keys:
@@ -171,6 +204,7 @@ def main():
     summary = {
         **stats,
         "photo_groups": len(keys),
+        "new_photo_groups": len(fresh),
         "val_groups": n_val,
         "train_images": counts["train"][0],
         "train_plates": counts["train"][1],
