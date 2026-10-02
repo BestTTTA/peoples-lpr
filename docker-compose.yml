@@ -27,8 +27,9 @@ services:
     networks:
       - facefinder
 
-  # Plate detector for auto-crop (crop-service/). Internal only: the web app
-  # calls it over the network; it has no published port.
+  # Plate detector for auto-crop (crop-service/). The web app calls it over the
+  # network; the port is on the server's loopback only, for local development
+  # through the SSH tunnel (npm run tunnel).
   plate-crop:
     build: ./crop-service
     image: peoples-lpr-crop:latest
@@ -43,6 +44,8 @@ services:
       OMP_NUM_THREADS: "4"
       # Shared with the web app (from .env); enables model upload/switching.
       ADMIN_TOKEN: ${CROP_ADMIN_TOKEN:-}
+    ports:
+      - "127.0.0.1:8765:8000"
     volumes:
       - crop-data:/data
     mem_limit: 2g

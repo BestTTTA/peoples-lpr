@@ -1,5 +1,6 @@
-// Local dev: forward localhost:15555 to Postgres on spark (127.0.0.1:5555 there)
-// over Tailscale, and reconnect whenever the connection drops.
+// Local dev: forward, over Tailscale, localhost:15555 to Postgres on spark
+// (127.0.0.1:5555 there) and localhost:8765 to the production plate detector
+// (crop-service, 127.0.0.1:8765 there); reconnect whenever the connection drops.
 import { spawn } from "node:child_process";
 
 const args = [
@@ -8,6 +9,7 @@ const args = [
   "-o", "ServerAliveInterval=30",
   "-o", "ServerAliveCountMax=3",
   "-L", "15555:127.0.0.1:5555",
+  "-L", "8765:127.0.0.1:8765",
   "sparkle@100.68.248.102",
 ];
 
@@ -16,7 +18,7 @@ let child;
 
 function connect() {
   const started = Date.now();
-  console.log(`[tunnel] connecting (localhost:15555 -> spark postgres)`);
+  console.log(`[tunnel] connecting (localhost:15555 -> spark postgres, localhost:8765 -> crop-service)`);
   child = spawn("ssh", args, { stdio: "inherit" });
   child.on("exit", (code) => {
     if (stopping) return;

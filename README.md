@@ -9,7 +9,7 @@ A site for returning lost Thai license plates (e.g. after floods). Finders photo
 ```bash
 cp .env.example .env.local   # then fill in the keys (see Environment below)
 npm install
-npm run tunnel               # separate terminal: Postgres on spark over Tailscale
+npm run tunnel               # separate terminal: Postgres + plate detector on spark over Tailscale
 npm run dev
 ```
 
@@ -80,7 +80,9 @@ filters them and the browser crops. In production it is the `plate-crop` compose
 service, reachable only from the web container; the image downloads the weights
 from a pinned revision and checks their sha256.
 
-Local dev (needs Python with `ultralytics`, or run the Docker image):
+Local dev uses the production detector through `npm run tunnel` (`localhost:8765`,
+so `CROP_API_URL=http://127.0.0.1:8765`). To run one on your machine instead, stop
+the tunnel's 8765 forward and (needs Python with `ultralytics`, or the Docker image):
 
 ```bash
 MODEL_PATH=path/to/best.pt python -m uvicorn --app-dir crop-service app:app --port 8765
