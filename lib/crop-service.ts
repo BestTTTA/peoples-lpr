@@ -1,7 +1,11 @@
 import "server-only";
 
 // The plate detector (crop-service/). Admin calls carry the shared token.
-export const CROP_BASE = process.env.CROP_API_URL ?? "http://plate-crop:8000";
+// Forgiving about how the base was written in .env: trailing slash, or the /crops path.
+export const CROP_BASE = (process.env.CROP_API_URL ?? "http://plate-crop:8000")
+  .trim()
+  .replace(/\/+$/, "")
+  .replace(/\/crops$/, "");
 
 export function cropFetch(path: string, init: RequestInit & { admin?: boolean } = {}) {
   const { admin, headers, ...rest } = init;

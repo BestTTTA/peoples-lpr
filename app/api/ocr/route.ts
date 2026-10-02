@@ -15,14 +15,15 @@ async function ocrBatch(files: File[], key: string): Promise<OcrResult[]> {
   const upstream = new FormData();
   files.forEach((f, i) => upstream.append("file", f, `plate-${i}.jpg`));
 
-  const base = process.env.OCR_API_URL ?? "https://ocrapi.roljetson.com";
+  // Forgiving about how the base was written in .env: trailing slash, or the /ocr path.
+  const base = (process.env.OCR_API_URL ?? "https://ocrapi.roljetson.com").trim().replace(/\/+$/, "").replace(/\/ocr$/, "");
   const res = await fetch(`${base}/ocr`, {
     method: "POST",
     headers: { "x-api-key": key },
     body: upstream,
   });
   const data = (await res.json().catch(() => ({}))) as Upstream;
-  if (!res.ok || !data.results) throw new Error(`OCR upstream ${res.status}: ${JSON.stringify(data.detail)}`);
+  if (!res.ok || !data.results) throw new Error(`OCR upstream ${res.status} at ${base}/ocr: ${JSON.stringify(data.detail)}`);
 
   return files.map((_, i) => {
     const r = data.results!.find((x) => x.index === i);

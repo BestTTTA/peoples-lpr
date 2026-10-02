@@ -1,6 +1,6 @@
 import "server-only";
 import { type Candidate, type DetectSettings, type ModelChoice, type RawBox, pickBest, plateShaped } from "./detect-config";
-import { cropFetch } from "./crop-service";
+import { CROP_BASE, cropFetch } from "./crop-service";
 
 /** One model's answer for one image. Never throws: failures come back as `error`. */
 async function runModel(file: Blob, model: string, s: DetectSettings): Promise<Candidate> {
@@ -20,7 +20,7 @@ async function runModel(file: Blob, model: string, s: DetectSettings): Promise<C
     const data = (await res.json().catch(() => ({}))) as {
       crops?: { box?: number[]; conf?: number; angle?: number; size?: number[] }[];
     };
-    if (!res.ok || !data.crops) throw new Error(`crop service ${res.status}`);
+    if (!res.ok || !data.crops) throw new Error(`crop service ${res.status} at ${CROP_BASE}`);
     const raw = data.crops
       .filter((c) => c.box?.length === 4)
       .map(
