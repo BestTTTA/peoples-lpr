@@ -15,6 +15,14 @@ import { type NextRequest, NextResponse } from "next/server";
  *
  * ALLOWED_HOSTS (comma separated, Thai or punycode) overrides the default list;
  * the first one is where other hosts are redirected.
+ *
+ * Development:
+ * - `npm run dev` (NODE_ENV=development) skips the API checks entirely, so
+ *   curl/Postman work without an Origin.
+ * - DEV_ORIGINS (default http://localhost:3000; "" to turn off) are origins a
+ *   local front-end may call the live API from: allowed, with CORS headers.
+ *   Admin calls still need the admin cookie, which browsers don't send
+ *   cross-site (SameSite=Strict): develop the admin page by running this app.
  */
 
 const DEFAULT_HOSTS = "ป้ายทะเบียนหาย.com,paitabianhai.com";
@@ -40,6 +48,34 @@ const LOOPBACK = /^(localhost|127\.0\.0\.1|\[::1\])$/;
 const DEV = process.env.NODE_ENV !== "production";
 
 const allowedHost = (h: string) => ALLOWED.has(h) || (DEV && LOOPBACK.test(h));
+
+const DEV_ORIGINS = new Set(
+  (process.env.DEV_ORIGINS ?? "http://localhost:3000")
+    .split(",")
+    .map((o) => o.trim().replace(/\/$/, ""))
+    .filter(Boolean),
+);
+
+function originOf(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
+/** CORS for a local front-end calling the live API. */
+function corsHeaders(origin: string): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Max-Age": "600",
+    Vary: "Origin",
+  };
+}
 
 function hostOf(url: string | null): string | null {
   if (!url) return null;
@@ -70,8 +106,22 @@ export function proxy(request: NextRequest) {
 
   if (!isApi) return NextResponse.next();
   if (path.startsWith("/api/branding/")) return NextResponse.next();
+  if (DEV) return NextResponse.next(); // npm run dev: no API checks
 
   const origin = headers.get("origin");
+
+  // A local front-end (DEV_ORIGINS) calling the live API: allowed, with CORS.
+  const devOrigin = originOf(origin) ?? originOf(headers.get("referer"));
+  if (devOrigin && DEV_ORIGINS.has(devOrigin)) {
+    const cors = corsHeaders(devOrigin);
+    if (request.method === "OPTIONS") return new NextResponse(null, { status: 204, headers: cors });
+    const res = NextResponse.next();
+    for (const [k, v] of Object.entries(cors)) res.headers.set(k, v);
+    // Its <img> tags load our photos from another site.
+    res.headers.set("Cross-Origin-Resource-Policy", "cross-origin");
+    return res;
+  }
+
   const from = origin ? hostOf(origin) : hostOf(headers.get("referer"));
   if (!from || !allowedHost(from)) return refuse(request, host, origin ? "origin" : from ? "referer" : "no-referer");
 
