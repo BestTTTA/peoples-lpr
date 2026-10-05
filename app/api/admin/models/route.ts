@@ -1,6 +1,6 @@
 import { denyUnlessAdmin } from "@/lib/admin";
 import { cropFetch, relay } from "@/lib/crop-service";
-import { sanitizeModels } from "@/lib/detect-config";
+import { chosenModels, sanitizeModels } from "@/lib/detect-config";
 import { getModelChoice, saveModelChoice } from "@/lib/detect-settings";
 
 // Cloudflare (free plan) refuses request bodies over 100 MB.
@@ -44,8 +44,8 @@ export async function PUT(request: Request) {
   if (denied) return denied;
   const choice = sanitizeModels(await request.json().catch(() => null));
   if (!choice)
-    return Response.json({ error: "เลือกโมเดลไม่ถูกต้อง (โหมดเปรียบเทียบต้องมี 2 โมเดลที่ต่างกัน)" }, { status: 400 });
-  for (const id of [choice.primary, choice.compare].filter((x): x is string => !!x)) {
+    return Response.json({ error: "เลือกโมเดลไม่ถูกต้อง (โหมดเปรียบเทียบต้องมี 2–3 โมเดลที่ไม่ซ้ำกัน)" }, { status: 400 });
+  for (const id of chosenModels(choice)) {
     const res = await cropFetch(`/models/${encodeURIComponent(id)}/load`, {
       method: "POST",
       admin: true,

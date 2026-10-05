@@ -160,17 +160,15 @@ function Models({
     saveChoice({ ...choice, mode, compare: second }, "mode");
   }
 
-  function setRole(id: string, role: "primary" | "compare") {
+  function setRole(id: string, role: "primary" | "compare" | "compare2") {
     if (!choice) return;
-    let { primary, compare } = choice;
-    if (role === "primary") {
-      if (compare === id) compare = primary; // swap
-      primary = id;
-    } else {
-      if (primary === id) primary = compare ?? primary; // swap
-      compare = id;
-    }
-    saveChoice({ ...choice, primary, compare }, id);
+    const next = { ...choice };
+    const from = (["primary", "compare", "compare2"] as const).find((r) => next[r] === id);
+    const old = next[role];
+    next[role] = id as string;
+    if (from && from !== role) next[from] = old as string; // swap
+    if (!next.primary || !next.compare) return;
+    saveChoice(next, id);
   }
 
   async function remove(id: string) {
@@ -229,7 +227,7 @@ function Models({
           {(
             [
               ["single", "ใช้โมเดลเดียว", "ใช้ผลจากโมเดลหลักอย่างเดียว"],
-              ["compare", "เปรียบเทียบ 2 โมเดล", "รันทั้งคู่ทุกรูป แล้วใช้ผลของโมเดลที่เจอป้ายมากกว่า"],
+              ["compare", "เปรียบเทียบ 2–3 โมเดล", "รันทุกโมเดลที่เลือกกับทุกรูป แล้วใช้ผลของโมเดลที่เจอป้ายมากที่สุด"],
             ] as const
           ).map(([m, label, sub]) => (
             <button
@@ -255,6 +253,7 @@ function Models({
         {models?.map((m) => {
           const isPrimary = choice?.primary === m.id;
           const isCompare = compare && choice?.compare === m.id;
+          const isThird = compare && choice?.compare2 === m.id;
           return (
             <li key={m.id} className="flex flex-wrap items-center gap-2 py-2">
               <div className="min-w-0 flex-1">
@@ -267,6 +266,9 @@ function Models({
                   )}
                   {isCompare && (
                     <span className="rounded bg-cyan/20 px-1.5 py-0.5 text-xs text-cyan">โมเดล B (เปรียบเทียบ)</span>
+                  )}
+                  {isThird && (
+                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-xs text-amber-400">โมเดล C (เปรียบเทียบ)</span>
                   )}
                 </div>
                 <div className="text-xs text-ink-3">
@@ -299,7 +301,27 @@ function Models({
                       ตั้งเป็น B
                     </button>
                   )}
-                  {!isPrimary && !isCompare && !m.builtin && (
+                  {compare && !isPrimary && !isCompare && !isThird && (
+                    <button
+                      type="button"
+                      className="btn-ghost px-3 py-1.5 text-sm"
+                      disabled={!!busy}
+                      onClick={() => setRole(m.id, "compare2")}
+                    >
+                      ตั้งเป็น C
+                    </button>
+                  )}
+                  {isThird && (
+                    <button
+                      type="button"
+                      className="btn-ghost px-3 py-1.5 text-sm"
+                      disabled={!!busy}
+                      onClick={() => choice && saveChoice({ ...choice, compare2: null }, m.id)}
+                    >
+                      เอา C ออก
+                    </button>
+                  )}
+                  {!isPrimary && !isCompare && !isThird && !m.builtin && (
                     <button
                       type="button"
                       className="btn-ghost px-3 py-1.5 text-sm"

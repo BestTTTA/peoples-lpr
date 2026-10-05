@@ -1,5 +1,13 @@
 import "server-only";
-import { type Candidate, type DetectSettings, type ModelChoice, type RawBox, pickBest, plateShaped } from "./detect-config";
+import {
+  type Candidate,
+  type DetectSettings,
+  type ModelChoice,
+  type RawBox,
+  chosenModels,
+  pickBest,
+  plateShaped,
+} from "./detect-config";
 import { CROP_BASE, cropFetch } from "./crop-service";
 
 /** One model's answer for one image. Never throws: failures come back as `error`. */
@@ -38,16 +46,16 @@ async function runModel(file: Blob, model: string, s: DetectSettings): Promise<C
 }
 
 /**
- * Detect plates with the configured model(s). In compare mode both run in
- * parallel and the one that finds more plates wins; if one fails, the other
- * still answers.
+ * Detect plates with the configured model(s). In compare mode they all run in
+ * parallel and the one that finds the most plates wins; if one fails, the
+ * others still answer.
  */
 export async function detect(
   file: Blob,
   settings: DetectSettings,
   choice: ModelChoice,
 ): Promise<{ best: Candidate | null; candidates: Candidate[] }> {
-  const models = choice.mode === "compare" && choice.compare ? [choice.primary, choice.compare] : [choice.primary];
+  const models = chosenModels(choice);
   const candidates = await Promise.all(models.map((m) => runModel(file, m, settings)));
   // A configured model that vanished (deleted, bad volume) should not stop auto-crop.
   if (candidates.every((c) => c.error) && !models.includes("builtin"))

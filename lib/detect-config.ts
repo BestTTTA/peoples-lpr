@@ -65,25 +65,35 @@ export function plateShaped({ box: [x1, y1, x2, y2], size }: RawBox, s: DetectSe
 
 /** Which detector model(s) auto-crop uses. */
 export type ModelChoice = {
-  /** "compare": run both models on each photo and keep the one that finds more plates. */
+  /** "compare": run every chosen model on each photo and keep the one that finds the most plates. */
   mode: "single" | "compare";
   primary: string;
   /** The second model in compare mode. */
   compare: string | null;
+  /** An optional third model in compare mode. */
+  compare2: string | null;
 };
 
-export const DEFAULT_MODELS: ModelChoice = { mode: "single", primary: "builtin", compare: null };
+export const DEFAULT_MODELS: ModelChoice = { mode: "single", primary: "builtin", compare: null, compare2: null };
+
+/** The models a choice runs, primary first. */
+export function chosenModels(c: ModelChoice): string[] {
+  return c.mode === "compare" ? [c.primary, c.compare, c.compare2].filter((m): m is string => !!m) : [c.primary];
+}
 
 const MODEL_ID = /^(builtin|[a-z0-9-]{1,64})$/;
 
 export function sanitizeModels(input: unknown): ModelChoice | null {
   if (!input || typeof input !== "object") return null;
-  const { mode, primary, compare } = input as Record<string, unknown>;
+  const { mode, primary, compare, compare2 } = input as Record<string, unknown>;
   if (mode !== "single" && mode !== "compare") return null;
   if (typeof primary !== "string" || !MODEL_ID.test(primary)) return null;
   const second = typeof compare === "string" && MODEL_ID.test(compare) ? compare : null;
   if (mode === "compare" && (!second || second === primary)) return null;
-  return { mode, primary, compare: second };
+  // Saved before the third slot existed, or left empty: two models.
+  const third = typeof compare2 === "string" && MODEL_ID.test(compare2) ? compare2 : null;
+  if (third && (third === primary || third === second)) return null;
+  return { mode, primary, compare: second, compare2: third };
 }
 
 export type Candidate = {
