@@ -43,7 +43,8 @@ export default function ScamWarningBanner() {
 
   // A solid bar above the header: the first thing anyone sees, one short line.
   return (
-    <div role="note" className="z-30 bg-warn text-plate">
+    // Above the z-50 popups (welcome, search result), under full-screen views.
+    <div role="note" className="relative z-[55] bg-warn text-plate">
       <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-1.5">
         <div className="min-w-0 flex-1 text-center">
           <span className="text-sm font-bold sm:text-base">⚠️ เว็บนี้ให้ใช้ฟรี ห้ามโอนเงินเด็ดขาด</span>{" "}
