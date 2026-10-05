@@ -27,13 +27,12 @@ function subscribe(cb: () => void): () => void {
 }
 
 export default function ScamWarningBanner() {
-  // "" during SSR and first paint, then whatever localStorage holds. Avoids a
-  // flash: on the first client paint we don't know yet, so we keep it hidden,
-  // and on the next tick it comes in correctly.
-  const dismissed = useSyncExternalStore(subscribe, readDismissed, () => "pending");
+  // Shown in the server HTML so it is there on first paint (the page doesn't
+  // jump when it arrives); a browser that dismissed it hides it on hydration.
+  const dismissed = useSyncExternalStore(subscribe, readDismissed, () => "");
   const [expanded, setExpanded] = useState(false);
 
-  if (dismissed === "pending" || dismissed === "1") return null;
+  if (dismissed === "1") return null;
 
   function dismiss() {
     try {
@@ -42,15 +41,22 @@ export default function ScamWarningBanner() {
     } catch {}
   }
 
+  // A solid bar above the header: the first thing anyone sees, one short line.
   return (
-    <div className="z-30 border-b border-warn/40 bg-warn/15 text-ink">
-      <div className="mx-auto flex max-w-7xl items-start gap-3 px-4 py-2.5">
-        <div className="min-w-0 flex-1">
-          <div className="text-sm leading-snug font-bold text-warn sm:text-base">
-            ⚠️ เว็บไซต์นี้ให้ใช้ฟรี ห้ามโอนเงิน และโปรดระวังมิจฉาชีพ
-          </div>
-          {expanded ? (
-            <p className="mt-1.5 text-xs leading-relaxed text-ink-3">
+    <div role="note" className="z-30 bg-warn text-plate">
+      <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-1.5">
+        <div className="min-w-0 flex-1 text-center">
+          <span className="text-sm font-bold sm:text-base">⚠️ เว็บนี้ให้ใช้ฟรี ห้ามโอนเงินเด็ดขาด</span>{" "}
+          <button
+            type="button"
+            className="text-xs font-semibold whitespace-nowrap underline underline-offset-2"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((v) => !v)}
+          >
+            {expanded ? "ซ่อน" : "ดูรายละเอียด"}
+          </button>
+          {expanded && (
+            <p className="mx-auto mt-1 max-w-3xl pb-1 text-xs leading-relaxed">
               เว็บไซต์นี้เป็นเพียงสื่อกลางในการประสานงาน และตามหาป้ายทะเบียนรถยนต์/รถจักรยานยนต์ที่หลุดหายให้บริการฟรีต่อสาธารณะ
               โดยจะไม่มีการเรียกร้องขอรับผลตอบแทนใด ๆ ทั้งสิ้น
               <br />
@@ -58,21 +64,13 @@ export default function ScamWarningBanner() {
               <br />
               ถ้าเป็นไปได้ ให้เดินทางไปรับป้ายด้วยตนเอง และพกเล่มทะเบียนหรือบัตรประชาชนไปเพื่อยืนยันความเป็นเจ้าของ
             </p>
-          ) : (
-            <button
-              type="button"
-              className="mt-0.5 text-xs text-ink-3 underline hover:text-ink"
-              onClick={() => setExpanded(true)}
-            >
-              ดูรายละเอียด
-            </button>
           )}
         </div>
         <button
           type="button"
           onClick={dismiss}
           aria-label="ปิดคำเตือน"
-          className="icon-btn shrink-0 text-ink-3 hover:text-ink"
+          className="shrink-0 self-start rounded px-1.5 text-sm font-bold opacity-70 hover:opacity-100"
         >
           ✕
         </button>
