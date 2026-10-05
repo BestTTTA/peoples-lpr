@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_Thai } from "next/font/google";
 import { connection } from "next/server";
 import Header from "@/components/Header";
+import ScamWarningBanner from "@/components/ScamWarningBanner";
 import WatchAlert from "@/components/WatchAlert";
 import { getBranding } from "@/lib/branding";
 import "./globals.css";
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="th" className={`${plex.variable} h-full antialiased`}>
       <body className="flex h-full flex-col">
+        <ScamWarningBanner />
         <Header />
         <main className="flex min-h-0 flex-1 flex-col">{children}</main>
         <WatchAlert />

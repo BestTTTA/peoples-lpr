@@ -49,3 +49,6 @@ next-env.d.ts
 
 # python
 __pycache__/
+
+# local scratch notes (plans, redo logs — not for git)
+/.notes/

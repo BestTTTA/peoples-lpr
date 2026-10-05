@@ -15,7 +15,7 @@ function env(name: string): string {
 
 // One pool per server process; survive dev hot reloads. (Bump the schema key
 // when ready() gains tables, so a running dev server runs it again.)
-const g = globalThis as unknown as { lprPool?: Pool; lprS3?: S3Client; lprSchemaV3?: Promise<void> };
+const g = globalThis as unknown as { lprPool?: Pool; lprS3?: S3Client; lprSchemaV4?: Promise<void> };
 
 function pool(): Pool {
   g.lprPool ??= new Pool({ connectionString: env("DATABASE_URL"), max: 5 });
@@ -36,7 +36,7 @@ const bucket = () => env("S3_BUCKET");
 
 /** Idempotent schema setup, run once per process before the first query. */
 function ready(): Promise<void> {
-  g.lprSchemaV3 ??= pool()
+  g.lprSchemaV4 ??= pool()
     .query(
       `CREATE TABLE IF NOT EXISTS reports (
          id          uuid PRIMARY KEY,
@@ -66,14 +66,26 @@ function ready(): Promise<void> {
          key         text PRIMARY KEY,
          value       jsonb NOT NULL,
          updated_at  timestamptz NOT NULL DEFAULT now()
-       );`,
+       );
+       CREATE TABLE IF NOT EXISTS watches (
+         id          uuid PRIMARY KEY,
+         token_hash  text NOT NULL,
+         name        text NOT NULL,
+         phone       text NOT NULL,
+         prefix      text NOT NULL,
+         number      text NOT NULL,
+         province    text NOT NULL,
+         consent_at  timestamptz NOT NULL,
+         created_at  timestamptz NOT NULL DEFAULT now()
+       );
+       CREATE INDEX IF NOT EXISTS watches_lookup_idx ON watches (province, prefix, number);`,
     )
     .then(() => undefined)
     .catch((err) => {
-      g.lprSchemaV3 = undefined; // retry on the next request
+      g.lprSchemaV4 = undefined; // retry on the next request
       throw err;
     });
-  return g.lprSchemaV3;
+  return g.lprSchemaV4;
 }
 
 type Row = {
@@ -275,4 +287,88 @@ export async function setSetting(key: string, value: unknown): Promise<void> {
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
     [key, JSON.stringify(value)],
   );
+}
+
+// --- "ฝากตามหา" (watches): owners register a plate + phone, and get a match
+// notification only when a finder reports that exact plate. Nothing from this
+// table is served publicly — the only readers are the match query at submit
+// time and the owner-side DELETE guarded by their token.
+
+export type WatchInput = {
+  name: string;
+  phone: string;
+  prefix: string;
+  number: string;
+  province: string;
+};
+
+export type WatchMatch = {
+  id: string;
+  name: string;
+  phone: string;
+  prefix: string;
+  number: string;
+  province: string;
+  since: string;
+  plateIndex: number; // position in the input plates list this watch matches
+};
+
+export async function addWatchRecord(
+  id: string,
+  tokenHash: string,
+  input: WatchInput,
+  consentAt: string,
+): Promise<void> {
+  await ready();
+  await pool().query(
+    `INSERT INTO watches (id, token_hash, name, phone, prefix, number, province, consent_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [id, tokenHash, input.name, input.phone, input.prefix, input.number, input.province, consentAt],
+  );
+}
+
+export async function removeWatchRecord(id: string, tokenHash: string): Promise<boolean> {
+  await ready();
+  const { rowCount } = await pool().query(
+    `DELETE FROM watches WHERE id = $1 AND token_hash = $2`,
+    [id, tokenHash],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+/** Watches matching any plate in the list, strict prefix+number+province. */
+export async function listWatchMatches(
+  plates: { prefix: string; number: string; province: string }[],
+): Promise<WatchMatch[]> {
+  if (plates.length === 0) return [];
+  await ready();
+  const { rows } = await pool().query<{
+    id: string;
+    name: string;
+    phone: string;
+    prefix: string;
+    number: string;
+    province: string;
+    created_at: Date;
+  }>(
+    `SELECT id, name, phone, prefix, number, province, created_at
+       FROM watches
+      WHERE (province, prefix, number) IN (${plates.map((_, i) => `($${i * 3 + 1}, $${i * 3 + 2}, $${i * 3 + 3})`).join(", ")})`,
+    plates.flatMap((p) => [p.province, p.prefix, p.number]),
+  );
+  return rows.map((r) => {
+    const idx = plates.findIndex(
+      (p) => p.prefix === r.prefix && p.number === r.number && p.province === r.province,
+    );
+    return {
+      id: r.id,
+      name: r.name,
+      phone: r.phone,
+      prefix: r.prefix,
+      number: r.number,
+      province: r.province,
+      since: r.created_at.toISOString(),
+      plateIndex: idx,
+    };
+  });
 }

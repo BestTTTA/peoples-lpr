@@ -4,7 +4,7 @@ import { MAX_PLATES } from "@/lib/limits";
 import { clean, isValidNumber, isValidPrefix } from "@/lib/plate";
 import { isProvince } from "@/lib/provinces";
 import { reverseGeocode } from "@/lib/geocode";
-import { addReport, listReports, saveFile } from "@/lib/store";
+import { addReport, listReports, listWatchMatches, saveFile } from "@/lib/store";
 import type { Plate, PublicReport, Report } from "@/lib/types";
 
 const MAX_PHOTOS = 10;
@@ -107,5 +107,11 @@ export async function POST(request: Request) {
     extraBoxes: sanitizeExtraBoxes(meta.extraBoxes, photoNames.length),
   };
   await addReport(report);
-  return Response.json({ id: report.id }, { status: 201 });
+  // Owners who used "ฝากตามหา" see nothing public about this report; the finder
+  // sees the match (name + phone) here, on the success screen, to coordinate
+  // the return.
+  const matches = await listWatchMatches(
+    report.plates.map((p) => ({ prefix: p.prefix, number: p.number, province: p.province })),
+  ).catch(() => []);
+  return Response.json({ id: report.id, matches }, { status: 201 });
 }

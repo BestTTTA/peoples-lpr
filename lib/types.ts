@@ -52,3 +52,19 @@ export type OcrResult = {
   plate_confidence: number;
   province_confidence: number;
 };
+
+/** Owner's "ฝากตามหา" that matches a plate on a finder's new report. The
+ * finder sees this once, on their success screen, so the owner can be
+ * contacted directly. Not public. */
+export type WatchMatch = {
+  id: string;
+  name: string;
+  phone: string;
+  prefix: string;
+  number: string;
+  province: string;
+  /** When the owner filed the request, so the finder can tell a fresh one from a stale one. */
+  since: string;
+  /** Which plate in the just-submitted report this match is for. */
+  plateIndex: number;
+};

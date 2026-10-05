@@ -13,7 +13,7 @@ import { postForm } from "@/lib/post";
 import { reportPath } from "@/lib/urls";
 import { clean, isValidNumber, isValidPrefix, numberProblem, prefixProblem, splitPlate } from "@/lib/plate";
 import { isProvince } from "@/lib/provinces";
-import type { OcrResult } from "@/lib/types";
+import type { OcrResult, WatchMatch } from "@/lib/types";
 
 /** AI detection state of a photo; undefined = not asked (manual mode). */
 type Scan = "busy" | "found" | "whole" | "none" | "fail";
@@ -75,8 +75,12 @@ export default function ReportFlow() {
   const [location, setLocation] = useState<LatLng | null>(null);
   const [note, setNote] = useState("");
   const [contact, setContact] = useState("");
+  const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  /** After submit: show matches first (owners who ฝากตามหา this plate), then
+   * let the finder continue to the pin on the map. */
+  const [success, setSuccess] = useState<{ reportId: string; matches: WatchMatch[] } | null>(null);
   /**
    * Review step, "ตรวจแก้ทีละป้าย": the plates that were yellow when it was
    * opened. A snapshot, so a plate stays on screen while it is being fixed
@@ -288,6 +292,7 @@ export default function ReportFlow() {
   }
 
   async function submit() {
+    if (!consent) return setError("กรุณายินยอมให้เก็บและเผยแพร่ข้อมูลก่อนยืนยัน");
     if (!location) return setError("กรุณาปักหมุดตำแหน่งที่พบป้าย");
     setError("");
     setBusy("กำลังบันทึก…");
@@ -323,12 +328,30 @@ export default function ReportFlow() {
     kept.forEach((d) => form.append("crop", d.crop, "plate.jpg"));
     try {
       // One attempt only: a retry after a lost response could save the report twice.
-      const data = await postForm<{ id: string }>("/api/reports", form, 1);
-      router.push(reportPath(data.id));
+      const data = await postForm<{ id: string; matches?: WatchMatch[] }>("/api/reports", form, 1);
+      const matches = data.matches ?? [];
+      if (matches.length === 0) {
+        router.push(reportPath(data.id));
+        return;
+      }
+      // Hold on the success screen so the finder can see the owner's contact
+      // and the "ask for proof" note before moving to the map.
+      setSuccess({ reportId: data.id, matches });
+      setBusy("");
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : "บันทึกไม่สำเร็จ");
       setBusy("");
     }
+  }
+
+  if (success) {
+    return (
+      <ReportSuccess
+        matches={success.matches}
+        reportedPlates={kept.map((d) => ({ prefix: clean(d.prefix), number: clean(d.number), province: d.province }))}
+        onContinue={() => router.push(reportPath(success.reportId))}
+      />
+    );
   }
 
   return (
@@ -705,6 +728,32 @@ export default function ReportFlow() {
 
       {step === 2 && (
         <section className="card flex flex-col gap-4 p-4">
+          <label
+            htmlFor="finder-consent"
+            className={`flex gap-2 rounded-xl border p-3 text-sm transition ${
+              consent ? "border-brand/50 bg-brand/5" : "border-warn/50 bg-warn/10"
+            }`}
+          >
+            <input
+              id="finder-consent"
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+            />
+            <span className="text-ink-3">
+              <b className="text-ink">ความยินยอมในการเก็บและเผยแพร่ข้อมูล</b>
+              <br />
+              ยินยอมให้ <b className="text-ink">ป้ายทะเบียนหาย.com</b> จัดเก็บและประกาศข้อมูลที่กรอก
+              (รูปป้าย, จุดที่พบ, ข้อความและช่องทางติดต่อถ้ามี) บนเว็บไซต์ เพื่อวัตถุประสงค์เดียวคือช่วยเจ้าของป้ายทะเบียนที่สูญหาย
+              ให้ติดต่อขอรับคืน โดยไม่อนุญาตให้นำไปใช้ในวัตถุประสงค์อื่น
+              <br />
+              <span className="text-ink-3/80">
+                จำเป็นต้องยินยอม จึงจะยืนยันขึ้นข้อมูลป้ายทะเบียนที่พบได้
+              </span>
+            </span>
+          </label>
+
           <div>
             <h2 className="font-semibold">ตำแหน่งที่พบป้าย / จุดรับคืน</h2>
             <p className="text-sm text-ink-3">ผู้ค้นหาจะเห็นหมุดนี้บนแผนที่</p>
@@ -756,9 +805,11 @@ export default function ReportFlow() {
                   ? kept.every(draftValid)
                     ? `${kept.length} ป้ายพร้อม${drafts.length > kept.length ? ` · ข้าม ${drafts.length - kept.length}` : ""}`
                     : `อีก ${kept.filter((d) => !draftValid(d)).length} ป้ายยังไม่ครบ — แก้ช่องสีแดง หรือกดข้าม`
-                  : location
-                    ? "พร้อมยืนยัน"
-                    : "ยังไม่ได้ปักหมุด")}
+                  : !consent
+                    ? "ติ๊กยินยอมก่อนจึงจะยืนยันได้"
+                    : location
+                      ? "พร้อมยืนยัน"
+                      : "ยังไม่ได้ปักหมุด")}
           </span>
           {step === 0 && (
             <button type="button" className="btn-primary ml-auto" disabled={!!busy || boxCount === 0} onClick={readPlates}>
@@ -771,7 +822,12 @@ export default function ReportFlow() {
             </button>
           )}
           {step === 2 && (
-            <button type="button" className="btn-primary ml-auto" disabled={!!busy || !location} onClick={submit}>
+            <button
+              type="button"
+              className="btn-primary ml-auto"
+              disabled={!!busy || !location || !consent}
+              onClick={submit}
+            >
               ยืนยันและขึ้นแผนที่
             </button>
           )}
@@ -792,4 +848,74 @@ function storedBox(b: Box) {
     ...(b.conf !== undefined ? { conf: b.conf } : {}),
     ...(b.rot ? { angle: b.rot.angle, pw: b.rot.w, ph: b.rot.h } : {}),
   };
+}
+
+/**
+ * Shown after a report with at least one owner-side "ฝากตามหา" match. The
+ * finder sees the owner's name + phone and the reminder to ask for proof of
+ * ownership before handing the plate back. (Consent to publish was taken on
+ * the previous step, so the match info is shown directly here.)
+ */
+function ReportSuccess({
+  matches,
+  reportedPlates,
+  onContinue,
+}: {
+  matches: WatchMatch[];
+  reportedPlates: { prefix: string; number: string; province: string }[];
+  onContinue: () => void;
+}) {
+  return (
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 p-4 pb-24">
+      <p className="text-sm text-emerald-400">
+        ✓ บันทึกแล้ว · {reportedPlates.length} ป้ายขึ้นแผนที่ · มีเจ้าของตามหา{" "}
+        <b>{matches.length}</b> คน
+      </p>
+
+      {matches.map((m) => (
+        <section
+          key={m.id}
+          className="card flex flex-col gap-4 border-emerald-500/40 bg-emerald-500/5 p-5 sm:flex-row sm:items-stretch"
+        >
+          <div className="flex flex-col items-center justify-center gap-2 sm:border-r sm:border-emerald-500/20 sm:pr-5">
+            <PlateBadge prefix={m.prefix} number={m.number} province={m.province} size="lg" />
+            <span className="text-xs text-ink-3">ฝากไว้ {relativeTime(m.since)}</span>
+          </div>
+
+          <div className="flex min-w-0 flex-1 flex-col justify-center gap-3">
+            <div>
+              <div className="text-xs text-ink-3">เจ้าของป้าย</div>
+              <div className="text-lg font-bold">{m.name}</div>
+            </div>
+            <a
+              href={`tel:${m.phone}`}
+              className="btn-primary justify-start px-4 py-3 text-left text-lg sm:text-xl"
+            >
+              <span aria-hidden>📞</span>
+              <span className="font-mono tracking-wide">{m.phone}</span>
+            </a>
+            <p className="text-xs text-ink-3">กดเพื่อโทร · ติดต่อเจ้าของเพื่อนัดส่งคืนได้เลย</p>
+          </div>
+        </section>
+      ))}
+
+      <div className="rounded-xl border border-warn/40 bg-warn/10 p-3 text-sm">
+        <b className="block">⚠️ ก่อนส่งมอบป้ายทะเบียนคืน (ถ้าสะดวก)</b>
+        โปรดขอดูหลักฐานการเป็นเจ้าของ เช่น รูปถ่าย บัตรประชาชน หรือสำเนาทะเบียนรถ
+      </div>
+
+      <button type="button" className="btn-ghost self-center" onClick={onContinue}>
+        ไปที่จุดรับคืนบนแผนที่ →
+      </button>
+    </div>
+  );
+}
+
+function relativeTime(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.max(1, Math.round(ms / 60_000));
+  if (min < 60) return `${min} นาทีที่แล้ว`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h} ชั่วโมงที่แล้ว`;
+  return `${Math.round(h / 24)} วันที่แล้ว`;
 }

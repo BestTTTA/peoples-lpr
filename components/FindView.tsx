@@ -8,6 +8,8 @@ import HitCard from "@/components/HitCard";
 import ReportCard, { timeAgo } from "@/components/ReportCard";
 import SearchHint from "@/components/SearchHint";
 import WelcomeChooser from "@/components/WelcomeChooser";
+import WatchRequestForm from "@/components/WatchRequestForm";
+import { type MyWatch, removeMyWatch, useMyWatches } from "@/lib/my-watches";
 import { clean, isValidNumber, isValidPrefix } from "@/lib/plate";
 import { RECENCY } from "@/lib/recency";
 import { toSpots } from "@/lib/spots";
@@ -303,6 +305,7 @@ export default function FindView({
 
             <SearchHint />
 
+            <MyWatchesList onPick={runSearch} />
             <WatchList onPick={runSearch} />
 
             {results ? (
@@ -403,15 +406,6 @@ export default function FindView({
               prefixInput.current?.focus();
             });
           }}
-          onWatch={async (q) => {
-            closeWelcome();
-            setPrefix(q.prefix);
-            setNumber(q.number);
-            setProvince(q.province);
-            // Found already: the popup shows it. Not yet: keep looking for it.
-            const r = await runSearch(q);
-            if (r && r.exact.length === 0) addWatch(q);
-          }}
         />
       )}
 
@@ -446,8 +440,14 @@ function SearchPopup({
   const found = exact.length > 0;
   const [copied, setCopied] = useState(false);
   const [watchError, setWatchError] = useState(false);
+  const [serverForm, setServerForm] = useState(false);
+  const [serverDone, setServerDone] = useState(false);
   const watches = useWatches();
+  const myWatches = useMyWatches();
   const watched = watches.some(
+    (w) => w.prefix === query.prefix && w.number === query.number && w.province === query.province,
+  );
+  const serverWatched = myWatches.some(
     (w) => w.prefix === query.prefix && w.number === query.number && w.province === query.province,
   );
 
@@ -521,14 +521,26 @@ function SearchPopup({
             ) : (
               <button
                 type="button"
-                className="btn-primary"
+                className="btn-ghost"
                 onClick={() => (addWatch(query) ? null : setWatchError(true))}
               >
-                🔔 ฝากตามหาป้ายนี้
+                🔔 ฝากตามหาแบบเตือนในเบราว์เซอร์นี้
               </button>
             )}
             {watchError && (
               <p className="text-sm text-warn">เบราว์เซอร์นี้ไม่อนุญาตให้บันทึก (อาจเป็นโหมดไม่ระบุตัวตน) — ใช้ลิงก์ด้านล่างแทน</p>
+            )}
+
+            {serverDone || serverWatched ? (
+              <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
+                📮 ฝากตามหาเรียบร้อยแล้ว — ผู้แจ้งพบป้ายนี้จะเห็นเบอร์คุณและติดต่อกลับได้ทันที
+              </p>
+            ) : serverForm ? (
+              <WatchRequestForm query={query} onDone={() => setServerDone(true)} />
+            ) : (
+              <button type="button" className="btn-primary" onClick={() => setServerForm(true)}>
+                📮 ฝากตามหา + ทิ้งเบอร์ให้ผู้แจ้งพบติดต่อ
+              </button>
             )}
             <div className="flex flex-wrap gap-2">
               {near.length > 0 && (
@@ -548,6 +560,52 @@ function SearchPopup({
         </button>
       </div>
     </div>
+  );
+}
+
+/** Server-side "ฝากตามหา" entries this browser owns (phone + name stored on the
+ * server). The owner cancels theirs here with the token kept in localStorage. */
+function MyWatchesList({ onPick }: { onPick: (q: PlateQuery) => void }) {
+  const watches = useMyWatches();
+  const [busy, setBusy] = useState<string | null>(null);
+  if (watches.length === 0) return null;
+  async function cancel(w: MyWatch) {
+    if (!confirm(`ยกเลิกคำฝากตามหา ${w.prefix}${w.number} ${w.province}?`)) return;
+    setBusy(w.id);
+    try {
+      await fetch("/api/watches", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: w.id, token: w.token }),
+      });
+    } catch {}
+    removeMyWatch(w.id);
+    setBusy(null);
+  }
+  return (
+    <section className="rounded-2xl border border-brand/40 bg-brand/5 p-3">
+      <h3 className="mb-2 text-sm font-semibold">📮 ฝากตามหาที่ทิ้งเบอร์ไว้ ({watches.length})</h3>
+      <ul className="flex flex-col gap-2">
+        {watches.map((w) => (
+          <li key={w.id} className="flex items-center gap-2">
+            <button type="button" onClick={() => onPick(w)} title="ค้นหาอีกครั้ง">
+              <PlateBadge prefix={w.prefix} number={w.number} province={w.province} size="sm" />
+            </button>
+            <span className="flex-1 text-xs text-ink-3">
+              ในชื่อ <b className="text-ink">{w.name}</b> · ฝากไว้ {timeAgo(w.since)}
+            </span>
+            <button
+              type="button"
+              className="text-xs text-ink-3 hover:text-red-400 disabled:opacity-50"
+              disabled={busy === w.id}
+              onClick={() => cancel(w)}
+            >
+              {busy === w.id ? "…" : "ยกเลิก"}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
