@@ -41,23 +41,36 @@ export default function ScamWarningBanner() {
     } catch {}
   }
 
-  // A solid bar above the header: the first thing anyone sees, one short line.
+  // A slim dark bar above the header with a soft amber glow: seen first,
+  // without shouting over the page.
   return (
     // Above the z-50 popups (welcome, search result), under full-screen views.
-    <div role="note" className="relative z-[55] bg-warn text-plate">
-      <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-1.5">
-        <div className="min-w-0 flex-1 text-center">
-          <span className="text-sm font-bold sm:text-base">⚠️ เว็บนี้ให้ใช้ฟรี ห้ามโอนเงินเด็ดขาด</span>{" "}
-          <button
-            type="button"
-            className="text-xs font-semibold whitespace-nowrap underline underline-offset-2"
-            aria-expanded={expanded}
-            onClick={() => setExpanded((v) => !v)}
-          >
-            {expanded ? "ซ่อน" : "ดูรายละเอียด"}
-          </button>
+    <div
+      role="note"
+      className="relative z-[55] border-b border-warn/25 bg-surface bg-[linear-gradient(90deg,rgb(245_165_36/0.16),rgb(245_165_36/0.04)_50%,rgb(245_165_36/0.16))] text-ink"
+    >
+      <div className="mx-auto flex max-w-7xl items-center gap-2.5 px-4 py-1.5">
+        <div className="flex min-w-0 flex-1 flex-col items-center">
+          <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1">
+            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-warn/20 text-[11px] text-warn ring-1 ring-warn/40">
+              !
+            </span>
+            <span className="text-[13px] leading-snug sm:text-sm">
+              <b className="font-semibold text-warn">เว็บนี้ให้ใช้ฟรี</b>
+              <span className="text-ink-3"> · </span>
+              ห้ามโอนเงินเด็ดขาด
+            </span>
+            <button
+              type="button"
+              className="rounded-full border border-line px-2 py-0.5 text-[11px] text-ink-3 transition hover:border-warn/50 hover:text-ink"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {expanded ? "ซ่อน" : "ดูรายละเอียด"}
+            </button>
+          </div>
           {expanded && (
-            <p className="mx-auto mt-1 max-w-3xl pb-1 text-xs leading-relaxed">
+            <p className="mt-1.5 max-w-3xl pb-1 text-center text-xs leading-relaxed text-ink-3">
               เว็บไซต์นี้เป็นเพียงสื่อกลางในการประสานงาน และตามหาป้ายทะเบียนรถยนต์/รถจักรยานยนต์ที่หลุดหายให้บริการฟรีต่อสาธารณะ
               โดยจะไม่มีการเรียกร้องขอรับผลตอบแทนใด ๆ ทั้งสิ้น
               <br />
@@ -71,7 +84,7 @@ export default function ScamWarningBanner() {
           type="button"
           onClick={dismiss}
           aria-label="ปิดคำเตือน"
-          className="shrink-0 self-start rounded px-1.5 text-sm font-bold opacity-70 hover:opacity-100"
+          className="shrink-0 self-start rounded-full px-1.5 text-sm text-ink-3 transition hover:text-ink"
         >
           ✕
         </button>
