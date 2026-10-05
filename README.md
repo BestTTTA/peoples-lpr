@@ -134,3 +134,15 @@ Second run (1 Oct 2026): 403 photos / 5,820 plates, fine-tuned from the first
 model, previous split kept; held out 80 photos / 1,270 plates. At conf 0.25:
 recall Koushim 60.3%, v1 97.7%, v2 98.1%; wrong boxes v1 197, v2 189;
 mAP50 0.43 / 0.959 / 0.971. Stopped early at epoch 67 (37 min on the GB10).
+
+Third run (5 Oct 2026): 854 photos / 10,392 plates (4,473 with stored boxes),
+fine-tuned from v2, previous split kept; held out 170 photos / 2,186 plates. At
+conf 0.25: recall Koushim 56.5%, v1 95.4%, v2 96.4%, v3 96.1%; wrong boxes 182 /
+279 / 255 / 265; mAP50 0.41 / 0.941 / 0.951 / 0.956. v3 is level with v2: the
+data doubled but the score plateaued. Stopped early at epoch 88 (1 h 40 min).
+
+`evaluate_combos.py ds 0.25 name=model.pt ...` scores compare mode (most plates
+wins) for every set of 1-3 models. Best sets: v2+v3 recall 96.8% (+8 plates over
+v2 alone, +25 wrong boxes); a third model added nothing (ANPR demo was picked
+on 1 photo of 170; v1 or Koushim only added wrong boxes). Live since 5 Oct:
+compare v3 (A) + v2 (B) + ANPR demo (C).
