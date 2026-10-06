@@ -728,32 +728,6 @@ export default function ReportFlow() {
 
       {step === 2 && (
         <section className="card flex flex-col gap-4 p-4">
-          <label
-            htmlFor="finder-consent"
-            className={`flex gap-2 rounded-xl border p-3 text-sm transition ${
-              consent ? "border-brand/50 bg-brand/5" : "border-warn/50 bg-warn/10"
-            }`}
-          >
-            <input
-              id="finder-consent"
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
-              checked={consent}
-              onChange={(e) => setConsent(e.target.checked)}
-            />
-            <span className="text-ink-3">
-              <b className="text-ink">ความยินยอมในการเก็บและเผยแพร่ข้อมูล</b>
-              <br />
-              ยินยอมให้ <b className="text-ink">ป้ายทะเบียนหาย.com</b> จัดเก็บและประกาศข้อมูลที่กรอก
-              (รูปป้าย, จุดที่พบ, ข้อความและช่องทางติดต่อถ้ามี) บนเว็บไซต์ เพื่อวัตถุประสงค์เดียวคือช่วยเจ้าของป้ายทะเบียนที่สูญหาย
-              ให้ติดต่อขอรับคืน โดยไม่อนุญาตให้นำไปใช้ในวัตถุประสงค์อื่น
-              <br />
-              <span className="text-ink-3/80">
-                จำเป็นต้องยินยอม จึงจะยืนยันขึ้นข้อมูลป้ายทะเบียนที่พบได้
-              </span>
-            </span>
-          </label>
-
           <div>
             <h2 className="font-semibold">ตำแหน่งที่พบป้าย / จุดรับคืน</h2>
             <p className="text-sm text-ink-3">ผู้ค้นหาจะเห็นหมุดนี้บนแผนที่</p>
@@ -784,6 +758,32 @@ export default function ReportFlow() {
               <PlateBadge key={d.key} prefix={clean(d.prefix)} number={d.number} province={d.province} size="sm" />
             ))}
           </div>
+
+          <label
+            htmlFor="finder-consent"
+            className={`flex gap-2 rounded-xl border p-3 text-sm transition ${
+              consent ? "border-brand/50 bg-brand/5" : "border-warn/50 bg-warn/10"
+            }`}
+          >
+            <input
+              id="finder-consent"
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+            />
+            <span className="text-ink-3">
+              <b className="text-ink">ความยินยอมในการเก็บและเผยแพร่ข้อมูล</b>
+              <br />
+              ยินยอมให้ <b className="text-ink">ป้ายทะเบียนหาย.com</b> จัดเก็บและประกาศข้อมูลที่กรอก
+              (รูปป้าย, จุดที่พบ, ข้อความและช่องทางติดต่อถ้ามี) บนเว็บไซต์ เพื่อวัตถุประสงค์เดียวคือช่วยเจ้าของป้ายทะเบียนที่สูญหาย
+              ให้ติดต่อขอรับคืน โดยไม่อนุญาตให้นำไปใช้ในวัตถุประสงค์อื่น
+              <br />
+              <span className="text-ink-3/80">
+                จำเป็นต้องยินยอม จึงจะยืนยันขึ้นข้อมูลป้ายทะเบียนที่พบได้
+              </span>
+            </span>
+          </label>
         </section>
       )}
 
