@@ -478,7 +478,9 @@ export async function addWatchRecord(
   );
 }
 
-export async function removeWatchRecord(id: string, tokenHash: string): Promise<boolean> {
+export type RemoveWatchResult = "cancelled" | "already-cancelled" | "missing";
+
+export async function removeWatchRecord(id: string, tokenHash: string): Promise<RemoveWatchResult> {
   await ready();
   const { rowCount } = await pool().query(
     `UPDATE watches
@@ -486,7 +488,27 @@ export async function removeWatchRecord(id: string, tokenHash: string): Promise<
       WHERE id = $1 AND token_hash = $2 AND status = 'ACTIVE'`,
     [id, tokenHash],
   );
-  return (rowCount ?? 0) > 0;
+  if ((rowCount ?? 0) > 0) return "cancelled";
+  const existing = await pool().query<{ status: string }>(
+    `SELECT status FROM watches WHERE id = $1 AND token_hash = $2`,
+    [id, tokenHash],
+  );
+  return existing.rows[0]?.status === "CANCELLED" ? "already-cancelled" : "missing";
+}
+
+export async function listActiveOwnedWatchIds(entries: { id: string; tokenHash: string }[]): Promise<string[]> {
+  if (entries.length === 0) return [];
+  await ready();
+  const values = entries.map((_, index) => `($${index * 2 + 1}::uuid, $${index * 2 + 2}::text)`).join(", ");
+  const { rows } = await pool().query<{ id: string }>(
+    `SELECT w.id
+       FROM watches w
+       JOIN (VALUES ${values}) AS owned(id, token_hash)
+         ON owned.id = w.id AND owned.token_hash = w.token_hash
+      WHERE w.status = 'ACTIVE'`,
+    entries.flatMap((entry) => [entry.id, entry.tokenHash]),
+  );
+  return rows.map((row) => row.id);
 }
 
 export type ManagedWatch = WatchInput & { id: string; createdAt: string };

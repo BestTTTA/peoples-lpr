@@ -94,9 +94,9 @@ export async function DELETE(request: Request) {
   const token = String(b.token ?? "");
   if (!id || !token) return bad("ข้อมูลไม่ครบ");
   try {
-    const ok = await removeWatchRecord(id, sha256(token));
-    if (!ok) return bad("ไม่พบคำฝากตามหา หรือรหัสยืนยันไม่ถูกต้อง", 404);
-    return Response.json({ ok: true });
+    const result = await removeWatchRecord(id, sha256(token));
+    if (result === "missing") return bad("ไม่พบคำฝากตามหา หรือรหัสยืนยันไม่ถูกต้อง", 404);
+    return Response.json({ ok: true, alreadyCancelled: result === "already-cancelled" });
   } catch (err) {
     console.error("cancel watch", err);
     return bad("ยกเลิกรายการไม่สำเร็จ กรุณาลองใหม่", 500);

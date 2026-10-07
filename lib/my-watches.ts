@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { PlateQuery } from "./urls";
 
 /**
@@ -21,6 +21,9 @@ export type MyWatch = PlateQuery & {
 const KEY = "peoples-lpr:my-watches";
 const MAX = 20;
 const EVENT = "peoples-lpr:my-watches";
+const SYNC_INTERVAL = 10 * 60_000;
+let lastSyncAt = 0;
+let syncPromise: Promise<void> | null = null;
 
 function parse(raw: string): MyWatch[] {
   try {
@@ -67,6 +70,42 @@ export function updateMyWatch(id: string, patch: Partial<Pick<MyWatch, "name" | 
   save(getMyWatches().map((w) => (w.id === id ? { ...w, ...patch } : w)));
 }
 
+async function syncMyWatches(force = false): Promise<void> {
+  const now = Date.now();
+  if (!force && now - lastSyncAt < SYNC_INTERVAL) return;
+  if (syncPromise) return syncPromise;
+  const checked = getMyWatches();
+  if (checked.length === 0) {
+    lastSyncAt = now;
+    return;
+  }
+  lastSyncAt = now;
+  syncPromise = (async () => {
+    try {
+      const res = await fetch("/api/watches/status", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ entries: checked.map(({ id, token }) => ({ id, token })) }),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { activeIds?: unknown };
+      if (!Array.isArray(data.activeIds) || !data.activeIds.every((id) => typeof id === "string")) return;
+      const activeIds = new Set(data.activeIds as string[]);
+      const checkedTokens = new Map(checked.map((watch) => [watch.id, watch.token]));
+      const current = getMyWatches();
+      const next = current.filter(
+        (watch) => checkedTokens.get(watch.id) !== watch.token || activeIds.has(watch.id),
+      );
+      if (next.length !== current.length) save(next);
+    } catch {
+      // Keep local entries when offline or the server is temporarily unavailable.
+    } finally {
+      syncPromise = null;
+    }
+  })();
+  return syncPromise;
+}
+
 function onChange(cb: () => void): () => void {
   window.addEventListener(EVENT, cb);
   window.addEventListener("storage", cb);
@@ -78,5 +117,13 @@ function onChange(cb: () => void): () => void {
 
 export function useMyWatches(): MyWatch[] {
   const raw = useSyncExternalStore(onChange, readRaw, () => "[]");
+  useEffect(() => {
+    void syncMyWatches(true);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void syncMyWatches();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
   return useMemo(() => parse(raw), [raw]);
 }
