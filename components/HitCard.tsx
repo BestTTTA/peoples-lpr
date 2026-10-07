@@ -4,6 +4,7 @@ import PhotoViewer from "@/components/PhotoViewer";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
 import { RecencyBadge, timeAgo } from "@/components/ReportCard";
+import { clientUuid } from "@/lib/client-uuid";
 import { clean, isValidNumber, isValidPrefix } from "@/lib/plate";
 import { isProvince } from "@/lib/provinces";
 import type { PlateText, SearchHit } from "@/lib/types";
@@ -38,7 +39,7 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
     if (!feedbackType || busy) return;
     const label = feedbackType === "OWNER_RECEIVED" ? "เจ้าของป้ายได้รับคืนแล้ว" : "ไม่พบป้าย ตามพิกัดที่แจ้ง";
     if (!confirm(`ยืนยันส่งคำขอว่า “${label}”?`)) return;
-    feedbackRequestId.current ??= crypto.randomUUID();
+    feedbackRequestId.current ??= clientUuid();
     setBusy("feedback");
     setError("");
     setMessage("");
@@ -71,7 +72,7 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
       return;
     }
     if (!confirm(`ยืนยันส่งคำขอแก้หมายเลขป้ายเป็น ${corrected.prefix} ${corrected.number} ${corrected.province || "ไม่ระบุจังหวัด"}?`)) return;
-    correctionRequestId.current ??= crypto.randomUUID();
+    correctionRequestId.current ??= clientUuid();
     setBusy("correction");
     setError("");
     setMessage("");

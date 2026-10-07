@@ -2,6 +2,7 @@
 import { useId, useState } from "react";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
+import { clientUuid } from "@/lib/client-uuid";
 import { addMyWatch } from "@/lib/my-watches";
 import { clean, isValidNumber, isValidPrefix } from "@/lib/plate";
 import { isProvince } from "@/lib/provinces";
@@ -29,7 +30,7 @@ export default function WatchRequestForm({ query, onDone }: { query: PlateQuery;
   const [confirmCode, setConfirmCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [requestId] = useState(() => crypto.randomUUID());
+  const [requestId] = useState(clientUuid);
 
   const prefixOk = isValidPrefix(prefix);
   const numberOk = isValidNumber(number);

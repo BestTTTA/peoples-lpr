@@ -7,6 +7,7 @@ import LocationPicker, { type LatLng } from "@/components/LocationPicker";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
 import UploadGuide from "@/components/UploadGuide";
+import { clientUuid } from "@/lib/client-uuid";
 import { type Box, cropPlate, detectPlates, preparePhoto, rotateBox, rotatePhoto } from "@/lib/image";
 import { MAX_PLATES } from "@/lib/limits";
 import { postForm } from "@/lib/post";
@@ -140,7 +141,7 @@ export default function ReportFlow() {
       const added: Photo[] = [];
       for (const f of files.slice(0, room)) {
         const p = await preparePhoto(f);
-        added.push({ id: crypto.randomUUID(), ...p, url: URL.createObjectURL(p.blob), boxes: [] });
+        added.push({ id: clientUuid(), ...p, url: URL.createObjectURL(p.blob), boxes: [] });
       }
       setPhotos((prev) => [...prev, ...added]);
       setActive(photos.length);
@@ -217,7 +218,7 @@ export default function ReportFlow() {
       for (const b of p.boxes) {
         const crop = await cropPlate(p.blob, b);
         next.push({
-          key: crypto.randomUUID(),
+          key: clientUuid(),
           photo: pi,
           box: b,
           crop,
