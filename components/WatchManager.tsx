@@ -1,7 +1,9 @@
 "use client";
 import { useState } from "react";
+import ContactChannels from "@/components/ContactChannels";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
+import { clientUuid } from "@/lib/client-uuid";
 import { removeMyWatch, updateMyWatch } from "@/lib/my-watches";
 import { clean, isValidNumber, isValidPrefix } from "@/lib/plate";
 import { isProvince } from "@/lib/provinces";
@@ -31,6 +33,18 @@ export default function WatchManager() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [showContact, setShowContact] = useState(false);
+  const [resetForm, setResetForm] = useState(false);
+  const [requesterName, setRequesterName] = useState("");
+  const [requesterPhone, setRequesterPhone] = useState("");
+  const [newManagementCode, setNewManagementCode] = useState("");
+  const [confirmManagementCode, setConfirmManagementCode] = useState("");
+  const [resetRequestId, setResetRequestId] = useState(clientUuid);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
 
   const lookupValid = isValidPrefix(prefix) && isValidNumber(number) && isProvince(province) && /^\d{6}$/.test(managementCode);
   const editValid =
@@ -39,6 +53,11 @@ export default function WatchManager() {
     isValidPrefix(newPrefix) &&
     isValidNumber(newNumber) &&
     isProvince(newProvince);
+  const resetValid =
+    !!requesterName.trim() &&
+    requesterPhone.replace(/\D/g, "").length >= 9 &&
+    /^\d{6}$/.test(newManagementCode) &&
+    newManagementCode === confirmManagementCode;
 
   function fill(result: ManagedWatch) {
     setWatch(result);
@@ -74,7 +93,21 @@ export default function WatchManager() {
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "ดำเนินการไม่สำเร็จ");
+      if (!res.ok) {
+        if (method === "POST" && res.status === 404 && data.code === "INVALID_CREDENTIALS") {
+          const nextAttempts = failedAttempts + 1;
+          setFailedAttempts(nextAttempts);
+          if (nextAttempts >= 3) {
+            setShowContact(false);
+            setResetForm(false);
+            setResetError("");
+            setResetMessage("");
+            setHelpOpen(true);
+          }
+        }
+        throw new Error(data.error || "ดำเนินการไม่สำเร็จ");
+      }
+      if (method === "POST") setFailedAttempts(0);
       if (method === "DELETE") {
         if (watch) removeMyWatch(watch.id);
         setWatch(null);
@@ -99,6 +132,40 @@ export default function WatchManager() {
       setError(err instanceof Error && err.message ? err.message : "ดำเนินการไม่สำเร็จ");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function submitResetRequest() {
+    if (!resetValid || resetBusy) return;
+    setResetBusy(true);
+    setResetError("");
+    setResetMessage("");
+    try {
+      const res = await fetch("/api/watches/code-reset", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          prefix: clean(prefix),
+          number: clean(number),
+          province,
+          requesterName: requesterName.trim(),
+          requesterPhone: requesterPhone.trim(),
+          newManagementCode,
+          requestId: resetRequestId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "ส่งคำขอเปลี่ยนรหัสไม่สำเร็จ");
+      setResetMessage(
+        data.alreadyPending
+          ? "รายการนี้มีคำขอรออนุมัติอยู่แล้ว กรุณารอ Admin ตรวจสอบ"
+          : "ส่งคำขอเรียบร้อยแล้ว รหัสจะเปลี่ยนเมื่อ Admin อนุมัติ",
+      );
+      setResetRequestId(clientUuid());
+    } catch (err) {
+      setResetError(err instanceof Error && err.message ? err.message : "ส่งคำขอเปลี่ยนรหัสไม่สำเร็จ");
+    } finally {
+      setResetBusy(false);
     }
   }
 
@@ -202,6 +269,103 @@ export default function WatchManager() {
 
       {message && <p className="mt-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">{message}</p>}
       {error && <p className="mt-2 text-sm text-warn">{error}</p>}
+      {failedAttempts > 0 && failedAttempts < 3 && !watch && (
+        <p className="mt-1 text-xs text-ink-3">กรอกไม่ถูกต้อง {failedAttempts} ครั้ง — หากครบ 3 ครั้ง สามารถติดต่อ Admin หรือยื่นคำขอเปลี่ยนรหัสได้</p>
+      )}
+
+      {helpOpen && (
+        <div
+          className="fixed inset-0 z-[70] grid place-items-center bg-black/70 p-4"
+          role="presentation"
+          onClick={(event) => event.target === event.currentTarget && setHelpOpen(false)}
+        >
+          <div role="dialog" aria-modal="true" aria-labelledby="watch-help-title" className="card flex max-h-[90vh] w-full max-w-md flex-col gap-4 overflow-y-auto p-5">
+            <div>
+              <h2 id="watch-help-title" className="text-lg font-bold">กรอกรหัสจัดการไม่ถูกต้อง 3 ครั้ง</h2>
+              <p className="mt-1 text-sm text-ink-3">
+                เลือกติดต่อ Admin โดยตรง หรือยื่นคำขอเปลี่ยนรหัสเพื่อรอ Admin ตรวจสอบและอนุมัติ
+              </p>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                className={showContact ? "btn-primary w-full" : "btn-ghost w-full"}
+                onClick={() => {
+                  setShowContact(true);
+                  setResetForm(false);
+                }}
+              >
+                ติดต่อ Admin
+              </button>
+              <button
+                type="button"
+                className={resetForm ? "btn-primary w-full" : "btn-ghost w-full"}
+                onClick={() => {
+                  setResetForm(true);
+                  setShowContact(false);
+                }}
+              >
+                ยื่นเรื่องขอเปลี่ยนรหัส
+              </button>
+            </div>
+
+            {showContact && <ContactChannels className="rounded-xl border border-line bg-surface-2/40 p-3" />}
+
+            {resetForm && (
+              <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface-2/40 p-3">
+                <div>
+                  <h3 className="font-semibold">ยื่นคำขอเปลี่ยนรหัสจัดการ</h3>
+                  <p className="mt-1 text-xs text-ink-3">กรอกเบอร์โทรเดียวกับที่ใช้ฝากหาป้าย และกำหนดรหัสใหม่ รหัสจะยังไม่เปลี่ยนจนกว่า Admin จะอนุมัติ</p>
+                </div>
+                <input
+                  className="field"
+                  placeholder="ชื่อผู้ยื่นคำขอ"
+                  maxLength={60}
+                  value={requesterName}
+                  onChange={(event) => setRequesterName(event.target.value)}
+                />
+                <input
+                  className="field"
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="เบอร์โทรที่ใช้ฝากหาป้าย"
+                  maxLength={40}
+                  value={requesterPhone}
+                  onChange={(event) => setRequesterPhone(event.target.value)}
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    className="field text-center font-mono tracking-[0.2em]"
+                    inputMode="numeric"
+                    placeholder="รหัสใหม่ 6 หลัก"
+                    maxLength={6}
+                    value={newManagementCode}
+                    onChange={(event) => setNewManagementCode(event.target.value.replace(/\D/g, ""))}
+                  />
+                  <input
+                    className="field text-center font-mono tracking-[0.2em]"
+                    inputMode="numeric"
+                    placeholder="ยืนยันรหัสใหม่"
+                    maxLength={6}
+                    value={confirmManagementCode}
+                    onChange={(event) => setConfirmManagementCode(event.target.value.replace(/\D/g, ""))}
+                  />
+                </div>
+                {resetError && <p className="text-sm text-warn">{resetError}</p>}
+                {resetMessage && <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">{resetMessage}</p>}
+                <button type="button" className="btn-primary w-full" disabled={!resetValid || resetBusy || !!resetMessage} onClick={submitResetRequest}>
+                  {resetBusy ? "กำลังส่งคำขอ…" : "ส่งให้ Admin อนุมัติ"}
+                </button>
+              </div>
+            )}
+
+            <button type="button" className="btn-ghost w-full" onClick={() => setHelpOpen(false)}>
+              ปิด
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

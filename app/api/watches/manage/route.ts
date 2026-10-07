@@ -57,7 +57,11 @@ export async function POST(request: Request) {
   if (!parsed) return bad("ข้อมูลป้ายหรือรหัสจัดการไม่ถูกต้อง");
   try {
     const watch = await getManagedWatch(parsed.lookup, parsed.codeHash);
-    if (!watch) return bad("ไม่พบรายการ หรือรหัสจัดการไม่ถูกต้อง", 404);
+    if (!watch)
+      return Response.json(
+        { error: "ไม่พบรายการ หรือรหัสจัดการไม่ถูกต้อง", code: "INVALID_CREDENTIALS" },
+        { status: 404 },
+      );
     return Response.json({ watch });
   } catch (err) {
     console.error("get managed watch", err);

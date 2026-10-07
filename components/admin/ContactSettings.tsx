@@ -60,7 +60,9 @@ export default function ContactSettings() {
     <section className="card flex flex-col gap-3 p-4">
       <div>
         <h2 className="font-bold">ช่องทางการติดต่อ</h2>
-        <p className="text-sm text-ink-3">แสดงท้ายทุกหน้า (เหนือเครดิต) · ไม่มีช่องทางก็จะไม่แสดง</p>
+        <p className="text-sm text-ink-3">
+          แสดงท้ายทุกหน้า (เหนือเครดิต) และในเมนู “ติดต่อผู้ดูแล” เมื่อกรอกรหัสจัดการผิดครบ 3 ครั้ง · ไม่มีช่องทางก็จะไม่แสดง
+        </p>
       </div>
 
       <div className="grid gap-2 md:grid-cols-2">

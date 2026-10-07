@@ -15,7 +15,7 @@ function env(name: string): string {
 
 // One pool per server process; survive dev hot reloads. (Bump the schema key
 // when ready() gains tables, so a running dev server runs it again.)
-const g = globalThis as unknown as { lprPool?: Pool; lprS3?: S3Client; lprSchemaV6?: Promise<void> };
+const g = globalThis as unknown as { lprPool?: Pool; lprS3?: S3Client; lprSchemaV8?: Promise<void> };
 
 function pool(): Pool {
   g.lprPool ??= new Pool({ connectionString: env("DATABASE_URL"), max: 5 });
@@ -36,7 +36,7 @@ const bucket = () => env("S3_BUCKET");
 
 /** Idempotent schema setup, run once per process before the first query. */
 function ready(): Promise<void> {
-  g.lprSchemaV6 ??= pool()
+  g.lprSchemaV8 ??= pool()
     .query(
       `CREATE TABLE IF NOT EXISTS reports (
          id          uuid PRIMARY KEY,
@@ -92,13 +92,33 @@ function ready(): Promise<void> {
            ALTER TABLE watches ADD CONSTRAINT watches_status_check CHECK (status IN ('ACTIVE', 'CANCELLED'));
          END IF;
        END $$;
-       CREATE UNIQUE INDEX IF NOT EXISTS watches_active_management_code_uniq
-         ON watches (management_code_hash)
+       DROP INDEX IF EXISTS watches_active_management_code_uniq;
+       CREATE UNIQUE INDEX IF NOT EXISTS watches_active_plate_management_code_uniq
+         ON watches (province, prefix, number, management_code_hash)
          WHERE status = 'ACTIVE' AND management_code_hash IS NOT NULL;
        CREATE UNIQUE INDEX IF NOT EXISTS watches_request_id_uniq
          ON watches (request_id) WHERE request_id IS NOT NULL;
        CREATE INDEX IF NOT EXISTS watches_active_lookup_idx
          ON watches (province, prefix, number) WHERE status = 'ACTIVE';
+       CREATE TABLE IF NOT EXISTS watch_code_reset_requests (
+         id                           uuid PRIMARY KEY,
+         watch_id                     uuid NOT NULL REFERENCES watches(id) ON DELETE CASCADE,
+         request_id                   uuid NOT NULL UNIQUE,
+         requester_name               text NOT NULL,
+         requester_phone              text NOT NULL,
+         current_management_code_hash text NOT NULL,
+         requested_code_hash          text NOT NULL,
+         review_status                text NOT NULL DEFAULT 'PENDING'
+           CHECK (review_status IN ('PENDING', 'APPROVED', 'REJECTED')),
+         created_at                   timestamptz NOT NULL DEFAULT now(),
+         reviewed_at                  timestamptz,
+         reviewed_by                  text,
+         admin_note                   text NOT NULL DEFAULT ''
+       );
+       CREATE UNIQUE INDEX IF NOT EXISTS watch_code_reset_pending_uniq
+         ON watch_code_reset_requests (watch_id) WHERE review_status = 'PENDING';
+       CREATE INDEX IF NOT EXISTS watch_code_reset_review_idx
+         ON watch_code_reset_requests (review_status, created_at DESC);
        ALTER TABLE plates ADD COLUMN IF NOT EXISTS ai_prefix text;
        ALTER TABLE plates ADD COLUMN IF NOT EXISTS ai_number text;
        ALTER TABLE plates ADD COLUMN IF NOT EXISTS ai_province text;
@@ -162,10 +182,10 @@ function ready(): Promise<void> {
     )
     .then(() => undefined)
     .catch((err) => {
-      g.lprSchemaV6 = undefined; // retry on the next request
+      g.lprSchemaV8 = undefined; // retry on the next request
       throw err;
     });
-  return g.lprSchemaV6;
+  return g.lprSchemaV8;
 }
 
 type StoredPlateRow = Plate & {
@@ -428,6 +448,8 @@ export type WatchInput = {
   province: string;
 };
 
+export type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
+
 export type WatchMatch = {
   id: string;
   name: string;
@@ -552,6 +574,188 @@ export async function cancelManagedWatch(
   return (rowCount ?? 0) > 0;
 }
 
+export type SubmitWatchCodeResetResult = "missing" | "pending" | "saved";
+
+export async function addWatchCodeResetRequest(
+  id: string,
+  requestId: string,
+  lookup: Pick<WatchInput, "prefix" | "number" | "province">,
+  requesterName: string,
+  requesterPhone: string,
+  requestedCodeHash: string,
+): Promise<SubmitWatchCodeResetResult> {
+  await ready();
+  const match = await pool().query<{ id: string; management_code_hash: string }>(
+    `SELECT id, management_code_hash
+       FROM watches
+      WHERE prefix = $1 AND number = $2 AND province = $3
+        AND phone = $4 AND status = 'ACTIVE' AND management_code_hash IS NOT NULL
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [lookup.prefix, lookup.number, lookup.province, requesterPhone],
+  );
+  const watch = match.rows[0];
+  if (!watch) return "missing";
+
+  const { rows } = await pool().query<{ id: string }>(
+    `INSERT INTO watch_code_reset_requests
+       (id, watch_id, request_id, requester_name, requester_phone,
+        current_management_code_hash, requested_code_hash)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT DO NOTHING
+     RETURNING id`,
+    [id, watch.id, requestId, requesterName, requesterPhone, watch.management_code_hash, requestedCodeHash],
+  );
+  if (rows.length) return "saved";
+  const existing = await pool().query(
+    `SELECT 1 FROM watch_code_reset_requests
+      WHERE watch_id = $1 AND review_status = 'PENDING'`,
+    [watch.id],
+  );
+  return existing.rows.length ? "pending" : "saved";
+}
+
+export type WatchCodeResetRequest = {
+  id: string;
+  watchId: string;
+  name: string;
+  phone: string;
+  requesterName: string;
+  requesterPhone: string;
+  prefix: string;
+  number: string;
+  province: string;
+  reviewStatus: ReviewStatus;
+  createdAt: string;
+  reviewedAt: string | null;
+  adminNote: string;
+};
+
+export async function listWatchCodeResetRequests(status: ReviewStatus): Promise<{
+  requests: WatchCodeResetRequest[];
+  stats: { pending: number; approved: number; rejected: number };
+}> {
+  await ready();
+  const { rows } = await pool().query<{
+    id: string;
+    watch_id: string;
+    name: string;
+    phone: string;
+    requester_name: string;
+    requester_phone: string;
+    prefix: string;
+    number: string;
+    province: string;
+    review_status: ReviewStatus;
+    created_at: Date;
+    reviewed_at: Date | null;
+    admin_note: string;
+  }>(
+    `SELECT r.id, r.watch_id, w.name, w.phone, r.requester_name, r.requester_phone,
+            w.prefix, w.number, w.province, r.review_status, r.created_at,
+            r.reviewed_at, r.admin_note
+       FROM watch_code_reset_requests r
+       JOIN watches w ON w.id = r.watch_id
+      WHERE r.review_status = $1
+      ORDER BY r.created_at DESC
+      LIMIT 200`,
+    [status],
+  );
+  const stats = await pool().query<{ pending: number; approved: number; rejected: number }>(
+    `SELECT
+       count(*) FILTER (WHERE review_status = 'PENDING')::int AS pending,
+       count(*) FILTER (WHERE review_status = 'APPROVED')::int AS approved,
+       count(*) FILTER (WHERE review_status = 'REJECTED')::int AS rejected
+       FROM watch_code_reset_requests`,
+  );
+  return {
+    requests: rows.map((row) => ({
+      id: row.id,
+      watchId: row.watch_id,
+      name: row.name,
+      phone: row.phone,
+      requesterName: row.requester_name,
+      requesterPhone: row.requester_phone,
+      prefix: row.prefix,
+      number: row.number,
+      province: row.province,
+      reviewStatus: row.review_status,
+      createdAt: row.created_at.toISOString(),
+      reviewedAt: row.reviewed_at?.toISOString() ?? null,
+      adminNote: row.admin_note,
+    })),
+    stats: stats.rows[0] ?? { pending: 0, approved: 0, rejected: 0 },
+  };
+}
+
+export type ReviewWatchCodeResetResult = "missing" | "already-reviewed" | "stale" | "ok";
+
+export async function reviewWatchCodeResetRequest(
+  id: string,
+  decision: "APPROVED" | "REJECTED",
+  adminNote: string,
+): Promise<ReviewWatchCodeResetResult> {
+  await ready();
+  const client = await pool().connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query<{
+      watch_id: string;
+      review_status: ReviewStatus;
+      current_management_code_hash: string;
+      requested_code_hash: string;
+      watch_status: string;
+      live_management_code_hash: string | null;
+    }>(
+      `SELECT r.watch_id, r.review_status, r.current_management_code_hash,
+              r.requested_code_hash, w.status AS watch_status,
+              w.management_code_hash AS live_management_code_hash
+         FROM watch_code_reset_requests r
+         JOIN watches w ON w.id = r.watch_id
+        WHERE r.id = $1
+        FOR UPDATE OF r, w`,
+      [id],
+    );
+    const request = rows[0];
+    if (!request) {
+      await client.query("ROLLBACK");
+      return "missing";
+    }
+    if (request.review_status !== "PENDING") {
+      await client.query("ROLLBACK");
+      return "already-reviewed";
+    }
+    if (decision === "APPROVED") {
+      if (
+        request.watch_status !== "ACTIVE" ||
+        request.live_management_code_hash !== request.current_management_code_hash
+      ) {
+        await client.query("ROLLBACK");
+        return "stale";
+      }
+      await client.query(
+        `UPDATE watches
+            SET management_code_hash = $2, updated_at = now()
+          WHERE id = $1`,
+        [request.watch_id, request.requested_code_hash],
+      );
+    }
+    await client.query(
+      `UPDATE watch_code_reset_requests
+          SET review_status = $2, reviewed_at = now(), reviewed_by = 'admin', admin_note = $3
+        WHERE id = $1`,
+      [id, decision, adminNote],
+    );
+    await client.query("COMMIT");
+    return "ok";
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 /** Watches matching any plate in the list, strict prefix+number+province. */
 export async function listWatchMatches(
   plates: { prefix: string; number: string; province: string }[],
@@ -641,7 +845,6 @@ export async function addPlateCorrectionRequest(
   return "conflict";
 }
 
-export type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type PlateRequestKind = "FEEDBACK" | "CORRECTION";
 
 export type PlateReviewRequest = {

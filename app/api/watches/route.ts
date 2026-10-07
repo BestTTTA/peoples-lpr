@@ -72,8 +72,8 @@ export async function POST(request: Request) {
     return Response.json({ id, token, managementCode }, { status: 201 });
   } catch (err) {
     const db = err as { code?: string; constraint?: string };
-    if (db.code === "23505" && db.constraint === "watches_active_management_code_uniq")
-      return bad("รหัสจัดการนี้ถูกใช้งานอยู่ กรุณากำหนดรหัสอื่น", 409);
+    if (db.code === "23505" && db.constraint === "watches_active_plate_management_code_uniq")
+      return bad("ป้ายนี้มีรายการที่ใช้รหัสจัดการเดียวกันอยู่แล้ว กรุณากำหนดรหัสอื่น", 409);
     if (db.code === "23505" && db.constraint === "watches_request_id_uniq")
       return bad("รายการนี้ถูกส่งไปแล้ว กรุณาตรวจรายการฝากหาของคุณ", 409);
     console.error("create watch", err);

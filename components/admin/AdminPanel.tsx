@@ -5,6 +5,7 @@ import LogoEditor from "@/components/admin/LogoEditor";
 import OgEditor from "@/components/admin/OgEditor";
 import PlateRequestManager from "@/components/admin/PlateRequestManager";
 import ReportManager from "@/components/admin/ReportManager";
+import WatchCodeResetManager from "@/components/admin/WatchCodeResetManager";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type Candidate,
@@ -43,7 +44,7 @@ export default function AdminPanel() {
   const [models, setModels] = useState<Model[] | null>(null);
   const [choice, setChoice] = useState<ModelChoice | null>(null);
   const [modelsError, setModelsError] = useState("");
-  const [tab, setTab] = useState<"reports" | "requests" | "ai" | "contact" | "brand" | "og">("reports");
+  const [tab, setTab] = useState<"reports" | "requests" | "code-resets" | "ai" | "contact" | "brand" | "og">("reports");
 
   const loadModels = useCallback(() => {
     api<{ models: Model[]; choice: ModelChoice }>("/api/admin/models")
@@ -75,11 +76,12 @@ export default function AdminPanel() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1 sm:grid-cols-6" role="tablist">
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1 sm:grid-cols-7" role="tablist">
         {(
           [
             ["reports", "เคสที่แจ้ง"],
             ["requests", "คำขอแก้ไข"],
+            ["code-resets", "เปลี่ยนรหัส"],
             ["ai", "AI ครอปป้าย"],
             ["contact", "ช่องทางติดต่อ"],
             ["brand", "โลโก้"],
@@ -101,6 +103,7 @@ export default function AdminPanel() {
 
       {tab === "reports" && <ReportManager />}
       {tab === "requests" && <PlateRequestManager />}
+      {tab === "code-resets" && <WatchCodeResetManager />}
       {tab === "ai" && (
         <>
           <p className="text-sm text-ink-3">ค่าที่บันทึกมีผลกับการครอปอัตโนมัติของทุกคนภายใน ~10 วินาที</p>
