@@ -29,7 +29,17 @@ type Meta = {
   lng: number;
   note?: string;
   contact?: string;
-  plates: { prefix: string; number: string; province: string; photo: number; box?: unknown }[];
+  plates: {
+    prefix: string;
+    number: string;
+    province: string;
+    photo: number;
+    box?: unknown;
+    aiPrefix?: unknown;
+    aiNumber?: unknown;
+    aiProvince?: unknown;
+    aiRawPlate?: unknown;
+  }[];
   /** AI boxes the finder deleted, plates boxed but left out: training data. */
   extraBoxes?: unknown;
 };
@@ -87,6 +97,15 @@ export async function POST(request: Request) {
       prefix: clean(p.prefix),
       number: clean(p.number),
       province: p.province,
+      aiDetected:
+        String(p.aiPrefix ?? "") || String(p.aiNumber ?? "") || String(p.aiProvince ?? "") || String(p.aiRawPlate ?? "")
+          ? {
+              prefix: clean(String(p.aiPrefix ?? "")).slice(0, 5),
+              number: clean(String(p.aiNumber ?? "")).slice(0, 4),
+              province: String(p.aiProvince ?? "").slice(0, 80),
+              raw: String(p.aiRawPlate ?? "").trim().slice(0, 40),
+            }
+          : null,
       crop: name,
       photo: p.photo,
       // Where it is in the photo, for training the detector; a bad box is dropped, not an error.

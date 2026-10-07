@@ -1,5 +1,14 @@
 import type { ExtraBox, StoredBox } from "./boxes";
 
+export type PlateText = {
+  prefix: string;
+  number: string;
+  province: string;
+  raw?: string;
+};
+
+export type PlateStatus = "ACTIVE" | "OWNER_RECEIVED" | "NOT_FOUND_AT_LOCATION";
+
 export type Plate = {
   id: string;
   /** Leading part: optional digit + 1–2 Thai letters, e.g. "กพ", "3ฒน". */
@@ -13,6 +22,14 @@ export type Plate = {
   photo: number;
   /** Where in that photo (training data); null for reports from before it was kept. */
   box?: StoredBox | null;
+  /** Raw OCR output before the finder reviewed or edited it; absent for manual/older reports. */
+  aiDetected?: PlateText | null;
+  /** The finder-reviewed value first stored with the report, before any later public correction. */
+  original?: PlateText;
+  /** Set when prefix/number/province above comes from a later correction. */
+  correctedAt?: string | null;
+  /** Availability after an admin-reviewed update request. */
+  status?: PlateStatus;
 };
 
 export type Report = {

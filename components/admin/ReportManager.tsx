@@ -166,8 +166,13 @@ export default function ReportManager() {
               </div>
               <ul className="mt-3 flex flex-wrap gap-2">
                 {plates.map((p) => (
-                  <li key={p.id} className={`relative ${busy === p.id ? "opacity-40" : ""}`}>
+                  <li key={p.id} className={`relative flex flex-col items-center gap-1 ${busy === p.id ? "opacity-40" : ""}`}>
                     <PlateBadge prefix={p.prefix} number={p.number} province={p.province} size="sm" />
+                    {p.status && p.status !== "ACTIVE" && (
+                      <span className={`text-[10px] font-semibold ${p.status === "OWNER_RECEIVED" ? "text-emerald-400" : "text-warn"}`}>
+                        {p.status === "OWNER_RECEIVED" ? "คืนเจ้าของแล้ว" : "ไม่พบตามพิกัด"}
+                      </span>
+                    )}
                     <button
                       type="button"
                       aria-label={`ลบป้าย ${p.prefix} ${p.number}`}

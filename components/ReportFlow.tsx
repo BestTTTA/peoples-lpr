@@ -48,6 +48,11 @@ type Draft = {
   prefix: string;
   number: string;
   province: string;
+  /** OCR snapshot: these do not change when the finder edits the fields below. */
+  aiPrefix: string;
+  aiNumber: string;
+  aiProvince: string;
+  aiRawPlate: string;
   plateConf: number;
   provinceConf: number;
   /** The OCR text needed repair (stray digits, letters missing): likely wrong even if "confident". */
@@ -220,6 +225,10 @@ export default function ReportFlow() {
           prefix: "",
           number: "",
           province: "",
+          aiPrefix: "",
+          aiNumber: "",
+          aiProvince: "",
+          aiRawPlate: "",
           plateConf: 0,
           provinceConf: 0,
         });
@@ -242,6 +251,10 @@ export default function ReportFlow() {
             number,
             suspect,
             province: isProvince(r.province) ? r.province : "",
+            aiPrefix: prefix,
+            aiNumber: number,
+            aiProvince: isProvince(r.province) ? r.province : "",
+            aiRawPlate: r.plate_number,
             plateConf: r.plate_confidence,
             provinceConf: r.province_confidence,
           });
@@ -310,6 +323,10 @@ export default function ReportFlow() {
           prefix: clean(d.prefix),
           number: clean(d.number),
           province: d.province,
+          aiPrefix: d.aiPrefix,
+          aiNumber: d.aiNumber,
+          aiProvince: d.aiProvince,
+          aiRawPlate: d.aiRawPlate,
           photo: used.indexOf(d.photo),
           box: storedBox(d.box),
         })),

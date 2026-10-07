@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { clean, isValidNumber, isValidPrefix } from "@/lib/plate";
 import { isProvince } from "@/lib/provinces";
+import { allowRequest } from "@/lib/rate-limit";
 import { addWatchRecord, removeWatchRecord } from "@/lib/store";
 
 // "ฝากตามหา": owners register a lost plate + their phone, and only the finder
@@ -9,6 +10,7 @@ import { addWatchRecord, removeWatchRecord } from "@/lib/store";
 
 const MAX_NAME = 60;
 const MAX_PHONE = 40;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function bad(msg: string, status = 400) {
   return Response.json({ error: msg }, { status });
@@ -27,6 +29,8 @@ function cleanPhone(raw: string): string {
 }
 
 export async function POST(request: Request) {
+  if (!allowRequest(request, "watch-create", 10, 10 * 60_000))
+    return bad("ส่งรายการถี่เกินไป กรุณารอสักครู่แล้วลองใหม่", 429);
   let body: unknown;
   try {
     body = await request.json();
@@ -42,6 +46,8 @@ export async function POST(request: Request) {
   const number = clean(String(b.number ?? ""));
   const province = String(b.province ?? "");
   const consent = b.consent === true;
+  const requestId = String(b.requestId ?? "");
+  const managementCode = String(b.managementCode ?? "").trim();
 
   if (!name) return bad("กรุณากรอกชื่อ");
   if (phone.replace(/\D/g, "").length < 9) return bad("กรุณากรอกเบอร์โทรให้ถูกต้อง");
@@ -49,16 +55,30 @@ export async function POST(request: Request) {
   if (!isValidNumber(number)) return bad(`เลขทะเบียน "${number}" ไม่ถูกต้อง`);
   if (!province || !isProvince(province)) return bad("กรุณาเลือกจังหวัด");
   if (!consent) return bad("กรุณายินยอมให้ใช้ข้อมูลเพื่อการตามหา");
+  if (!UUID.test(requestId)) return bad("ข้อมูลคำขอไม่ถูกต้อง");
+  if (!/^\d{6}$/.test(managementCode)) return bad("กรุณากำหนดรหัสจัดการเป็นตัวเลข 6 หลัก");
 
   const id = randomUUID();
   const token = randomBytes(24).toString("base64url");
-  await addWatchRecord(
-    id,
-    sha256(token),
-    { name, phone, prefix, number, province },
-    new Date().toISOString(),
-  );
-  return Response.json({ id, token }, { status: 201 });
+  try {
+    await addWatchRecord(
+      id,
+      sha256(token),
+      sha256(managementCode),
+      requestId,
+      { name, phone, prefix, number, province },
+      new Date().toISOString(),
+    );
+    return Response.json({ id, token, managementCode }, { status: 201 });
+  } catch (err) {
+    const db = err as { code?: string; constraint?: string };
+    if (db.code === "23505" && db.constraint === "watches_active_management_code_uniq")
+      return bad("รหัสจัดการนี้ถูกใช้งานอยู่ กรุณากำหนดรหัสอื่น", 409);
+    if (db.code === "23505" && db.constraint === "watches_request_id_uniq")
+      return bad("รายการนี้ถูกส่งไปแล้ว กรุณาตรวจรายการฝากหาของคุณ", 409);
+    console.error("create watch", err);
+    return bad("บันทึกรายการไม่สำเร็จ กรุณาลองใหม่", 500);
+  }
 }
 
 export async function DELETE(request: Request) {
@@ -73,7 +93,12 @@ export async function DELETE(request: Request) {
   const id = String(b.id ?? "");
   const token = String(b.token ?? "");
   if (!id || !token) return bad("ข้อมูลไม่ครบ");
-  const ok = await removeWatchRecord(id, sha256(token));
-  if (!ok) return bad("ไม่พบคำฝากตามหา หรือรหัสยืนยันไม่ถูกต้อง", 404);
-  return Response.json({ ok: true });
+  try {
+    const ok = await removeWatchRecord(id, sha256(token));
+    if (!ok) return bad("ไม่พบคำฝากตามหา หรือรหัสยืนยันไม่ถูกต้อง", 404);
+    return Response.json({ ok: true });
+  } catch (err) {
+    console.error("cancel watch", err);
+    return bad("ยกเลิกรายการไม่สำเร็จ กรุณาลองใหม่", 500);
+  }
 }

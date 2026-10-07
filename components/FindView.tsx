@@ -9,6 +9,7 @@ import ReportCard, { timeAgo } from "@/components/ReportCard";
 import SearchHint from "@/components/SearchHint";
 import WelcomeChooser from "@/components/WelcomeChooser";
 import WatchRequestForm from "@/components/WatchRequestForm";
+import WatchManager from "@/components/WatchManager";
 import { type MyWatch, removeMyWatch, useMyWatches } from "@/lib/my-watches";
 import { clean, isValidNumber, isValidPrefix } from "@/lib/plate";
 import { RECENCY } from "@/lib/recency";
@@ -306,6 +307,7 @@ export default function FindView({
             <SearchHint />
 
             <MyWatchesList onPick={runSearch} />
+            <WatchManager />
             <WatchList onPick={runSearch} />
 
             {results ? (
@@ -441,7 +443,7 @@ function SearchPopup({
   const [copied, setCopied] = useState(false);
   const [watchError, setWatchError] = useState(false);
   const [serverForm, setServerForm] = useState(false);
-  const [serverDone, setServerDone] = useState(false);
+  const [serverCode, setServerCode] = useState("");
   const watches = useWatches();
   const myWatches = useMyWatches();
   const watched = watches.some(
@@ -531,12 +533,26 @@ function SearchPopup({
               <p className="text-sm text-warn">เบราว์เซอร์นี้ไม่อนุญาตให้บันทึก (อาจเป็นโหมดไม่ระบุตัวตน) — ใช้ลิงก์ด้านล่างแทน</p>
             )}
 
-            {serverDone || serverWatched ? (
+            {serverCode ? (
+              <div className="rounded-xl border border-emerald-500/50 bg-emerald-500/10 p-3 text-sm">
+                <b className="text-emerald-400">📮 ฝากตามหาเรียบร้อยแล้ว</b>
+                <p className="mt-1 text-ink-3">เก็บรหัสนี้ไว้สำหรับแก้ไขหรือยกเลิกรายการ</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="flex-1 rounded-lg bg-surface px-3 py-2 text-center text-xl font-bold tracking-[0.3em] text-ink">
+                    {serverCode}
+                  </code>
+                  <button type="button" className="btn-ghost px-3 py-2 text-sm" onClick={() => navigator.clipboard.writeText(serverCode).catch(() => {})}>
+                    คัดลอก
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-warn">นี่คือรหัสที่คุณกำหนด กรุณาจดเก็บไว้ก่อนปิดหน้าต่าง</p>
+              </div>
+            ) : serverWatched ? (
               <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
                 📮 ฝากตามหาเรียบร้อยแล้ว — ผู้แจ้งพบป้ายนี้จะเห็นเบอร์คุณและติดต่อกลับได้ทันที
               </p>
             ) : serverForm ? (
-              <WatchRequestForm query={query} onDone={() => setServerDone(true)} />
+              <WatchRequestForm query={query} onDone={setServerCode} />
             ) : (
               <button type="button" className="btn-primary" onClick={() => setServerForm(true)}>
                 📮 ฝากตามหา + ทิ้งเบอร์ให้ผู้แจ้งพบติดต่อ
@@ -568,19 +584,26 @@ function SearchPopup({
 function MyWatchesList({ onPick }: { onPick: (q: PlateQuery) => void }) {
   const watches = useMyWatches();
   const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
   if (watches.length === 0) return null;
   async function cancel(w: MyWatch) {
     if (!confirm(`ยกเลิกคำฝากตามหา ${w.prefix}${w.number} ${w.province}?`)) return;
     setBusy(w.id);
+    setError("");
     try {
-      await fetch("/api/watches", {
+      const res = await fetch("/api/watches", {
         method: "DELETE",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id: w.id, token: w.token }),
       });
-    } catch {}
-    removeMyWatch(w.id);
-    setBusy(null);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "ยกเลิกรายการไม่สำเร็จ");
+      removeMyWatch(w.id);
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "ยกเลิกรายการไม่สำเร็จ");
+    } finally {
+      setBusy(null);
+    }
   }
   return (
     <section className="rounded-2xl border border-brand/40 bg-brand/5 p-3">
@@ -605,6 +628,7 @@ function MyWatchesList({ onPick }: { onPick: (q: PlateQuery) => void }) {
           </li>
         ))}
       </ul>
+      {error && <p className="mt-2 text-xs text-warn">{error}</p>}
     </section>
   );
 }

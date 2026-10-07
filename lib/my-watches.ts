@@ -13,6 +13,7 @@ import type { PlateQuery } from "./urls";
 export type MyWatch = PlateQuery & {
   id: string;
   token: string;
+  managementCode?: string;
   since: string;
   name: string;
 };
@@ -60,6 +61,10 @@ export function addMyWatch(w: MyWatch): boolean {
 
 export function removeMyWatch(id: string): void {
   save(getMyWatches().filter((w) => w.id !== id));
+}
+
+export function updateMyWatch(id: string, patch: Partial<Pick<MyWatch, "name" | "prefix" | "number" | "province">>): void {
+  save(getMyWatches().map((w) => (w.id === id ? { ...w, ...patch } : w)));
 }
 
 function onChange(cb: () => void): () => void {

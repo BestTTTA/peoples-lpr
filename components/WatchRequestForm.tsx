@@ -17,7 +17,7 @@ const SITE_NAME = "ป้ายทะเบียนหาย.com";
  * report. Returns an {id, token} the browser keeps in localStorage so the
  * owner can cancel without an account.
  */
-export default function WatchRequestForm({ query, onDone }: { query: PlateQuery; onDone: () => void }) {
+export default function WatchRequestForm({ query, onDone }: { query: PlateQuery; onDone: (managementCode: string) => void }) {
   const consentId = useId();
   const [prefix, setPrefix] = useState(query.prefix);
   const [number, setNumber] = useState(query.number);
@@ -25,14 +25,19 @@ export default function WatchRequestForm({ query, onDone }: { query: PlateQuery;
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [consent, setConsent] = useState(false);
+  const [managementCode, setManagementCode] = useState("");
+  const [confirmCode, setConfirmCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [requestId] = useState(() => crypto.randomUUID());
 
   const prefixOk = isValidPrefix(prefix);
   const numberOk = isValidNumber(number);
   const provinceOk = province !== "" && isProvince(province);
   const phoneDigits = phone.replace(/\D/g, "").length;
-  const canSubmit = prefixOk && numberOk && provinceOk && name.trim() && phoneDigits >= 9 && consent && !busy;
+  const codeOk = /^\d{6}$/.test(managementCode);
+  const codeMatches = codeOk && confirmCode === managementCode;
+  const canSubmit = prefixOk && numberOk && provinceOk && name.trim() && phoneDigits >= 9 && codeMatches && consent && !busy;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -50,6 +55,8 @@ export default function WatchRequestForm({ query, onDone }: { query: PlateQuery;
           number: clean(number),
           province,
           consent: true,
+          requestId,
+          managementCode,
         }),
       });
       const data = await res.json();
@@ -57,13 +64,14 @@ export default function WatchRequestForm({ query, onDone }: { query: PlateQuery;
       addMyWatch({
         id: data.id,
         token: data.token,
+        managementCode: data.managementCode,
         prefix: clean(prefix),
         number: clean(number),
         province,
         since: new Date().toISOString(),
         name: name.trim(),
       });
-      onDone();
+      onDone(data.managementCode);
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : "ฝากตามหาไม่สำเร็จ");
       setBusy(false);
@@ -136,6 +144,36 @@ export default function WatchRequestForm({ query, onDone }: { query: PlateQuery;
           แสดงต่อผู้แจ้งพบป้ายของคุณเท่านั้น เราไม่โทรหาคุณและไม่ส่งต่อให้ผู้อื่น
         </span>
       </label>
+
+      <div className="grid grid-cols-2 items-end gap-2">
+        <label className="min-w-0 text-sm font-medium">
+          <span className="mb-1 block">กำหนดรหัสจัดการ 6 หลัก</span>
+          <input
+            className={`field text-center font-mono tracking-[0.25em] ${managementCode && !codeOk ? "border-warn" : ""}`}
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={6}
+            value={managementCode}
+            onChange={(e) => setManagementCode(e.target.value.replace(/\D/g, ""))}
+          />
+        </label>
+        <label className="min-w-0 text-sm font-medium">
+          <span className="mb-1 block">ยืนยันรหัสจัดการ</span>
+          <input
+            className={`field text-center font-mono tracking-[0.25em] ${confirmCode && !codeMatches ? "border-warn" : ""}`}
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={6}
+            value={confirmCode}
+            onChange={(e) => setConfirmCode(e.target.value.replace(/\D/g, ""))}
+          />
+        </label>
+        <p className="col-span-2 text-xs text-ink-3">
+          ใช้รหัสนี้สำหรับแก้ไขหรือยกเลิกรายการ กรุณาจดเก็บไว้ และอย่าใช้รหัสที่เดาง่าย
+        </p>
+      </div>
 
       <label htmlFor={consentId} className="flex gap-2 rounded-xl border border-line bg-surface-2/40 p-3 text-xs text-ink-3">
         <input

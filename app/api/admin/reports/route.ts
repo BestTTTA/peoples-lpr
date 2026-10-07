@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const page = Math.max(0, Number(url.searchParams.get("page")) || 0);
   const plateQ = clean(q);
 
-  const all = await listReports(); // newest first
+  const all = await listReports(true); // newest first, including reviewed inactive plates
   const hits = q
     ? all.filter(
         (r) =>
