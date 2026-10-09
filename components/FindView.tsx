@@ -1,36 +1,48 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import DevCredit from "@/components/DevCredit";
 import FoundMap, { type Focus } from "@/components/FoundMap";
+import HitCard from "@/components/HitCard";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
-import HitCard from "@/components/HitCard";
-import ReportCard, { timeAgo } from "@/components/ReportCard";
-import SearchHint from "@/components/SearchHint";
+import { timeAgo } from "@/components/ReportCard";
+import WatchManager from "@/components/WatchManager";
 import WelcomeChooser from "@/components/WelcomeChooser";
 import WatchRequestForm from "@/components/WatchRequestForm";
-import WatchManager from "@/components/WatchManager";
 import { type MyWatch, removeMyWatch, useMyWatches } from "@/lib/my-watches";
-import { clean, isValidNumber, isValidPrefix } from "@/lib/plate";
-import { RECENCY } from "@/lib/recency";
-import { toSpots } from "@/lib/spots";
+import { clean, isValidNumber, isValidPrefix, splitPlate } from "@/lib/plate";
 import type { PublicReport, SearchHit } from "@/lib/types";
-import { type PlateQuery, href, searchPath } from "@/lib/urls";
+import { type PlateQuery, REPORT_PATH, href, searchPath } from "@/lib/urls";
 import { addWatch, removeWatch, useWatches } from "@/lib/watches";
 
 type Results = { exact: SearchHit[]; near: SearchHit[] };
 
-/** Spots listed at first, and how many more each "ดูเพิ่มเติม" shows. */
-const LIST_STEP = 10;
 const WELCOMED = "peoples-lpr:welcomed";
 
-function FunnelIcon() {
+function Icon({ children, className = "h-5 w-5" }: { children: React.ReactNode; className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
-      <path d="M3 4.5h18l-7 8.2v6.3l-4 1.5v-7.8z" />
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {children}
     </svg>
   );
 }
+
+const SearchIcon = ({ className }: { className?: string }) => (
+  <Icon className={className}>
+    <circle cx="11" cy="11" r="6.5" />
+    <path d="m16 16 4.5 4.5" />
+  </Icon>
+);
 
 type InitialReport = { reportId: string; at: { lat: number; lng: number } | null };
 
@@ -46,23 +58,132 @@ export default function FindView({
   const [reports, setReports] = useState<PublicReport[]>([]);
   const [focus, setFocus] = useState<Focus | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [panelOpen, setPanelOpen] = useState(true);
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [filterProvince, setFilterProvince] = useState("");
-  const [listShown, setListShown] = useState(LIST_STEP);
-  const [prefix, setPrefix] = useState(initialSearch?.prefix ?? "");
-  const [number, setNumber] = useState(initialSearch?.number ?? "");
+  const [plateText, setPlateText] = useState(initialSearch ? `${initialSearch.prefix} ${initialSearch.number}` : "");
   const [province, setProvince] = useState(initialSearch?.province ?? "");
   const [touched, setTouched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [results, setResults] = useState<Results | null>(null);
-  /** The popup announcing a search outcome; closed by the finder. */
-  const [popup, setPopup] = useState<(Results & { query: PlateQuery }) | null>(null);
-  const cardRefs = useRef(new Map<string, HTMLElement>());
-  const prefixInput = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState<PlateQuery | null>(initialSearch);
+  /** The "not found yet" popup (watch options); closed by the finder. */
+  const [popup, setPopup] = useState(false);
+  const plateInput = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<HTMLElement>(null);
+  const scrollToMap = useRef(false);
   /** "What are you here for?" on arriving at the home page, once per visit. */
   const [welcome, setWelcome] = useState(false);
+
+  // One field for the whole plate: "3ฒน 5702", "3ฒน5702" or "3ฒน-5702" all split the same way.
+  const parsed = useMemo(() => splitPlate(plateText), [plateText]);
+  const plateOk = isValidPrefix(parsed.prefix) && isValidNumber(parsed.number);
+
+  /** What the map draws: the search matches, or (for a /จุดพบ link) every report. */
+  const mapReports = useMemo<PublicReport[]>(() => {
+    if (!results) return reports;
+    const full = new Map(reports.map((r) => [r.id, r]));
+    const byId = new Map<string, PublicReport>();
+    for (const { report, plate } of [...results.exact, ...results.near]) {
+      let entry = byId.get(report.id);
+      if (!entry) {
+        const { id, createdAt, lat, lng, place } = report;
+        entry = full.get(id) ?? { id, createdAt, lat, lng, place: place ?? "", plates: [] };
+        byId.set(id, entry);
+      }
+      if (!full.has(report.id)) entry.plates.push({ prefix: plate.prefix, number: plate.number, province: plate.province });
+    }
+    return [...byId.values()];
+  }, [results, reports]);
+
+  const focusId = focus?.reportIds[0];
+  const focusReport = mapReports.find((r) => r.id === focusId);
+  const focusNote = [...(results?.exact ?? []), ...(results?.near ?? [])].find((h) => h.report.id === focusId)?.report
+    .note;
+
+  function select(id: string) {
+    const r = mapReports.find((x) => x.id === id);
+    if (!r) return;
+    setSelected(id);
+    setFocus({ lat: r.lat, lng: r.lng, reportIds: [id] });
+  }
+
+  const showHit = (h: SearchHit) => {
+    scrollToMap.current = true;
+    setSelected(h.report.id);
+    setFocus({ lat: h.report.lat, lng: h.report.lng, reportIds: [h.report.id] });
+  };
+
+  function search(e: React.FormEvent) {
+    e.preventDefault();
+    setTouched(true);
+    if (!plateOk) return;
+    runSearch({ prefix: clean(parsed.prefix), number: clean(parsed.number), province });
+  }
+
+  async function runSearch(p: PlateQuery) {
+    setLoading(true);
+    setError("");
+    setQuery(p);
+    setPlateText(`${p.prefix} ${p.number}`);
+    setProvince(p.province);
+    // The address bar shows the search, so it can be shared or bookmarked.
+    window.history.replaceState(null, "", href(searchPath(p.prefix, p.number, p.province)));
+    try {
+      const res = await fetch(`/api/search?${new URLSearchParams(p)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setResults(data);
+      const hits = data.exact as SearchHit[];
+      // No exact match: still put the closest ones on the map.
+      const first = hits[0] ?? (data.near as SearchHit[])[0];
+      setPopup(!hits[0]);
+      if (first) {
+        setSelected(first.report.id);
+        setFocus({
+          lat: first.report.lat,
+          lng: first.report.lng,
+          reportIds: hits[0] ? hits.map((h) => h.report.id) : [first.report.id],
+        });
+      } else {
+        setSelected(null);
+        setFocus(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "ค้นหาไม่สำเร็จ");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    // Only a /จุดพบ link needs the reports: show that one once the data is in.
+    if (!initialReport) return;
+    fetch("/api/reports")
+      .then((r) => r.json())
+      .then((data: PublicReport[]) => {
+        setReports(data);
+        const r = data.find((x) => x.id === initialReport.reportId);
+        const at = r ? { lat: r.lat, lng: r.lng } : initialReport.at;
+        if (at) {
+          setFocus({ ...at, reportIds: [initialReport.reportId] });
+          setSelected(initialReport.reportId);
+        }
+      })
+      .catch(() => {
+        if (initialReport.at) {
+          setFocus({ ...initialReport.at, reportIds: [initialReport.reportId] });
+          setSelected(initialReport.reportId);
+        }
+      });
+    // Only on first load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (initialSearch) runSearch(initialSearch);
+    // Only on first load; later searches go through the form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (initialSearch || initialReport) return; // came with a purpose (a search or report link)
@@ -82,376 +203,210 @@ export default function FindView({
     } catch {}
   }
 
-
-  const visible = useMemo(
-    () =>
-      (filterProvince ? reports.filter((r) => r.plates.some((p) => p.province === filterProvince)) : reports)
-        .slice()
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [reports, filterProvince],
-  );
-  // The list and the counts go by spot (reports from one place merged), like the map pins.
-  const spots = useMemo(() => toSpots(visible), [visible]);
-  const spotTotal = useMemo(() => toSpots(reports).length, [reports]);
-
-  const prefixOk = isValidPrefix(prefix);
-  const numberOk = isValidNumber(number);
-  const plateTotal = reports.reduce((s, r) => s + r.plates.length, 0);
-
-  function select(id: string, scroll = false) {
-    const r = reports.find((x) => x.id === id);
-    if (!r) return;
-    setSelected(id);
-    setFocus({ lat: r.lat, lng: r.lng, reportIds: [id] });
-    if (scroll) {
-      setPanelOpen(true);
-      const index = spots.findIndex((s) => s.reportIds.includes(id));
-      const spotId = spots[index]?.id ?? id;
-      // A pin further down than the list shows: show enough to reach its card.
-      if (index >= listShown) setListShown(Math.ceil((index + 1) / LIST_STEP) * LIST_STEP);
-      requestAnimationFrame(() =>
-        cardRefs.current.get(spotId)?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
-      );
-    }
-  }
-
-  function search(e: React.FormEvent) {
-    e.preventDefault();
-    setTouched(true);
-    if (!prefixOk || !numberOk) return;
-    runSearch({ prefix: clean(prefix), number: clean(number), province });
-  }
-
-  async function runSearch(p: PlateQuery): Promise<Results | null> {
-    setLoading(true);
-    setError("");
-    // The address bar shows the search, so it can be shared or bookmarked.
-    window.history.replaceState(null, "", href(searchPath(p.prefix, p.number, p.province)));
-    try {
-      const q = new URLSearchParams(p);
-      const res = await fetch(`/api/search?${q}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setResults(data);
-      setPopup({ ...data, query: p });
-      const hits = data.exact as SearchHit[];
-      if (hits[0]) {
-        setSelected(hits[0].report.id);
-        setFocus({ lat: hits[0].report.lat, lng: hits[0].report.lng, reportIds: hits.map((h) => h.report.id) });
-      }
-      return data as Results;
-    } catch (err) {
-      setError(err instanceof Error && err.message ? err.message : "ค้นหาไม่สำเร็จ");
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    if (results) resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [results]);
 
   useEffect(() => {
-    fetch("/api/reports")
-      .then((r) => r.json())
-      .then((data: PublicReport[]) => {
-        setReports(data);
-        // A report link: show it once the data is in.
-        if (initialReport) {
-          const r = data.find((x) => x.id === initialReport.reportId);
-          const at = r ? { lat: r.lat, lng: r.lng } : initialReport.at;
-          if (at) {
-            setFocus({ ...at, reportIds: [initialReport.reportId] });
-            setSelected(initialReport.reportId);
-          }
-        }
-        if (initialSearch) runSearch(initialSearch);
-      })
-      .catch(() => setError("โหลดข้อมูลแผนที่ไม่สำเร็จ"));
-    // Only on first load; later searches go through the form.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (focus && scrollToMap.current) mapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    scrollToMap.current = false;
+  }, [focus]);
 
-  const showFromPopup = (h: SearchHit) => {
-    setPopup(null);
-    showHit(h);
-  };
+  function focusSearch() {
+    plateInput.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    plateInput.current?.focus({ preventScroll: true });
+  }
 
-  const showHit = (h: SearchHit) => {
-    setSelected(h.report.id);
-    setFocus({ lat: h.report.lat, lng: h.report.lng, reportIds: [h.report.id] });
-  };
+  const mapCard = focus && (
+    <section ref={mapRef} className="card scroll-mt-4 overflow-hidden">
+      <div className="h-[340px] sm:h-[420px]">
+        <FoundMap reports={mapReports} focus={focus} onSelect={select} />
+      </div>
+      <div className="flex flex-col gap-3 border-t border-line p-4 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1">
+          <div className="text-xs text-ink-3">จุดพบ / จุดรับคืน</div>
+          <div className="font-semibold">{focusReport?.place || `${focus.lat.toFixed(5)}, ${focus.lng.toFixed(5)}`}</div>
+          {focusNote && <p className="text-sm text-ink-3">{focusNote}</p>}
+        </div>
+        <a
+          className="btn-primary"
+          href={`https://www.google.com/maps/dir/?api=1&destination=${focus.lat},${focus.lng}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          🧭 นำทางด้วย Google Maps
+        </a>
+      </div>
+    </section>
+  );
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto md:block md:overflow-hidden">
-      <div className="relative h-[48vh] shrink-0 md:absolute md:inset-0 md:h-auto">
-        <FoundMap reports={visible} focus={focus} onSelect={(id) => select(id, true)} />
-      </div>
+    <div className="dark-scroll flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <section className="border-b border-line bg-surface">
+        <div className="mx-auto w-full max-w-[830px] px-4 py-6 text-center sm:py-9">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <span className="rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
+              สำหรับเจ้าของป้ายที่ทำหล่นหรือสูญหาย
+            </span>
+            <span className="rounded-full bg-emerald-600/10 px-3 py-1 text-xs font-semibold text-emerald-400">
+              ค้นหาฟรี · ไม่เรียกเก็บเงิน
+            </span>
+          </div>
+          <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-5xl">ป้ายของคุณหายใช่ไหม?</h1>
+          <p className="mt-2 text-ink-3 sm:text-lg">
+            กรอกเลขทะเบียนเพื่อเช็กว่ามีผู้แจ้งพบแล้วหรือยัง ดูตำแหน่งบนแผนที่ และฝากตามหาไว้ได้
+          </p>
 
-      {!panelOpen && (
-        <button
-          type="button"
-          onClick={() => setPanelOpen(true)}
-          className="btn absolute top-4 right-4 z-10 hidden border border-line bg-surface text-ink md:inline-flex"
-        >
-          ☰ รายการป้ายที่พบ
-        </button>
-      )}
-
-      {panelOpen && (
-        <>
-          <button
-            type="button"
-            aria-label="ซ่อนรายการ"
-            onClick={() => setPanelOpen(false)}
-            className="absolute top-4 right-[412px] z-10 hidden h-9 w-9 place-items-center rounded-full border border-line bg-surface text-lg text-ink md:grid"
+          <form
+            onSubmit={search}
+            noValidate
+            className="mt-5 rounded-3xl border border-brand/30 bg-surface p-4 text-left shadow-lg ring-4 ring-brand/10 sm:p-5"
           >
-            ×
-          </button>
-          <aside className="dark-scroll relative z-10 flex flex-col gap-3 [&>*]:shrink-0 border-t border-line bg-surface p-4 md:absolute md:top-4 md:right-4 md:bottom-4 md:w-[380px] md:overflow-y-auto md:rounded-3xl md:border">
-            <div className="flex items-start gap-2">
-              <div className="min-w-0 flex-1">
-                <h1 className="text-xl font-bold">ตามหาป้ายทะเบียน</h1>
-                <p className="text-sm text-ink-3">
-                  พบแล้ว <b className="text-ink">{plateTotal.toLocaleString("th-TH")}</b> ป้าย ·{" "}
-                  {spotTotal.toLocaleString("th-TH")} จุด
-                </p>
-              </div>
-              <button
-                type="button"
-                aria-label="กรองตามจังหวัด"
-                aria-expanded={filterOpen}
-                onClick={() => setFilterOpen((v) => !v)}
-                className={`icon-btn relative ${filterOpen || filterProvince ? "bg-surface-2 text-ink" : ""}`}
-              >
-                <FunnelIcon />
-                {filterProvince && <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-brand" />}
-              </button>
-            </div>
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_230px_auto] md:items-end">
+              <label className="text-sm font-medium">
+                <span className="mb-1 flex items-center gap-1.5">
+                  <i className="h-2 w-2 rounded-full bg-violet" /> ทะเบียนรถ
+                </span>
+                <input
+                  ref={plateInput}
+                  className={`field py-3.5 text-xl ${touched && !plateOk ? "border-warn" : ""}`}
+                  placeholder="เช่น 3ฒน 5702"
+                  value={plateText}
+                  maxLength={14}
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(e) => setPlateText(e.target.value)}
+                />
+              </label>
 
-            {filterOpen && (
-              <div className="rounded-xl border border-line bg-surface-2/60 p-3">
-                <div className="mb-1.5 text-sm font-medium">กรองจุดตามจังหวัดของป้าย</div>
-                <div className="flex gap-2">
-                  <ProvinceInput
-                    className="flex-1"
-                    value={filterProvince}
-                    onChange={(v) => {
-                      setFilterProvince(v);
-                      setListShown(LIST_STEP);
-                    }}
-                    emptyLabel="ทุกจังหวัด"
-                  />
-                  {filterProvince && (
-                    <button type="button" className="btn-ghost px-3" onClick={() => {
-                        setFilterProvince("");
-                        setListShown(LIST_STEP);
-                      }}>
-                      ล้าง
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={search} className="flex flex-col gap-3 rounded-2xl border border-line p-3" noValidate>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="text-sm font-medium">
-                  <span className="mb-1 flex items-center gap-1.5">
-                    <i className="h-2 w-2 rounded-full bg-violet" /> หมวดอักษร
-                  </span>
-                  <input
-                    className={`field ${touched && !prefixOk ? "border-warn" : ""}`}
-                    ref={prefixInput}
-                    placeholder="เช่น 3ฒน"
-                    value={prefix}
-                    maxLength={5}
-                    onChange={(e) => setPrefix(e.target.value)}
-                  />
-                </label>
-                <label className="text-sm font-medium">
-                  <span className="mb-1 flex items-center gap-1.5">
-                    <i className="h-2 w-2 rounded-full bg-cyan" /> เลขทะเบียน
-                  </span>
-                  <input
-                    className={`field ${touched && !numberOk ? "border-warn" : ""}`}
-                    placeholder="เช่น 5702"
-                    inputMode="numeric"
-                    maxLength={4}
-                    value={number}
-                    onChange={(e) => setNumber(e.target.value.replace(/\D/g, ""))}
-                  />
-                </label>
-              </div>
               <label className="text-sm font-medium">
                 <span className="mb-1 flex items-center gap-1.5">
                   <i className="h-2 w-2 rounded-full bg-warn" /> จังหวัด
                   <span className="font-normal text-ink-3">(ไม่บังคับ)</span>
                 </span>
-                <ProvinceInput value={province} onChange={setProvince} emptyLabel="ทุกจังหวัด" />
+                <ProvinceInput
+                  className="[&_.field]:py-3.5 [&_.field]:text-lg"
+                  value={province}
+                  onChange={setProvince}
+                  emptyLabel="ทุกจังหวัด"
+                />
               </label>
 
-              {touched && (!prefixOk || !numberOk) && (
-                <p className="text-xs text-warn">
-                  {!prefixOk && "หมวดอักษรต้องเป็นตัวอักษรไทย 1–2 ตัว (มีเลขนำหน้าได้) · "}
-                  {!numberOk && "เลขทะเบียน 1–4 หลัก"}
-                </p>
-              )}
+              <button type="submit" className="btn-primary px-7 py-3.5 text-lg" disabled={loading}>
+                <SearchIcon className="h-5 w-5" />
+                {loading ? "กำลังค้นหา…" : "ค้นหา"}
+              </button>
+            </div>
 
-              <div className="flex items-center gap-3">
-                <PlateBadge prefix={clean(prefix)} number={number} province={province} size="sm" emptyProvince="ทุกจังหวัด" />
-                <button type="submit" className="btn-primary ml-auto" disabled={loading}>
-                  {loading ? "กำลังค้นหา…" : "ค้นหา"}
-                </button>
-              </div>
-              {error && <p className="text-sm text-red-400">{error}</p>}
-            </form>
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <PlateBadge prefix={clean(parsed.prefix)} number={parsed.number} province={province} size="sm" emptyProvince="ทุกจังหวัด" />
+              <span className="text-xs text-ink-3">พิมพ์ติดกัน เว้นวรรค หรือใช้ขีดได้ เช่น 3ฒน5702, 3ฒน 5702</span>
+            </div>
 
-            <SearchHint />
+            {touched && !plateOk && (
+              <p className="mt-2 text-xs text-warn">
+                กรอกทะเบียนให้ครบ: หมวดอักษรไทย 1–2 ตัว (มีเลขนำหน้าได้) แล้วตามด้วยเลข 1–4 หลัก เช่น 3ฒน 5702
+              </p>
+            )}
+            {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+          </form>
 
-            <MyWatchesList onPick={runSearch} />
-            <WatchManager />
-            <WatchList onPick={runSearch} />
+          <p className="mt-4 text-sm text-ink-3">
+            ส่วนนี้ใช้เมื่อป้ายของคุณหาย · พบหรือเก็บป้ายของผู้อื่นได้?{" "}
+            <Link href={href(REPORT_PATH)} className="font-semibold text-brand underline">
+              ไปแจ้งป้ายที่พบ →
+            </Link>
+          </p>
+        </div>
+      </section>
 
-            {results ? (
-              <section className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  className="self-start text-sm text-ink-3 hover:text-ink"
-                  onClick={() => setResults(null)}
-                >
-                  ← กลับไปยังรายการทั้งหมด
-                </button>
-                {results.exact.length > 0 ? (
-                  <>
-                    <h2 className="font-bold text-emerald-400">🎉 พบป้ายของคุณ {results.exact.length} รายการ</h2>
-                    {results.exact.map((h) => (
-                      <HitCard key={h.plate.id} hit={h} active={selected === h.report.id} onShow={() => showHit(h)} />
-                    ))}
-                  </>
-                ) : (
-                  <div className="rounded-xl bg-surface-2 p-3 text-sm">
-                    <b>ยังไม่พบป้ายนี้</b>
-                    <p className="mt-1 text-ink-3">
-                      ลองตรวจสอบหมวดอักษรและจังหวัดอีกครั้ง หรือกลับมาค้นหาใหม่ภายหลัง — มีผู้แจ้งพบป้ายเพิ่มขึ้นทุกวัน
-                    </p>
-                  </div>
-                )}
-                {results.near.length > 0 && (
-                  <>
-                    <h2 className="mt-2 text-sm font-bold">
-                      ป้ายที่ใกล้เคียง{" "}
-                      <span className="font-normal text-ink-3">(อาจอ่านผิด 1 ตัว หรือจังหวัดคลาดเคลื่อน)</span>
-                    </h2>
-                    {results.near.map((h) => (
-                      <HitCard key={h.plate.id} hit={h} active={selected === h.report.id} onShow={() => showHit(h)} />
-                    ))}
-                  </>
-                )}
+      <div className="mx-auto flex w-full max-w-[830px] flex-1 flex-col gap-4 px-4 py-6 sm:py-8">
+        <MyWatchesList onPick={runSearch} />
+        <WatchManager />
+        <WatchList onPick={runSearch} />
+
+        {results && (
+          <div ref={resultsRef} className="flex scroll-mt-4 flex-col gap-4">
+            {results.exact.length > 0 ? (
+              <section className="card flex flex-col gap-2 p-4">
+                <h2 className="font-bold text-emerald-400">🎉 พบป้ายของคุณ {results.exact.length} รายการ</h2>
+                {results.exact.map((h) => (
+                  <HitCard key={h.plate.id} hit={h} active={selected === h.report.id} onShow={() => showHit(h)} />
+                ))}
               </section>
             ) : (
-              <section className="flex flex-col">
-                <div className="mb-1 flex items-center justify-between">
-                  <h2 className="text-lg font-bold">จุดที่พบป้ายล่าสุด</h2>
-                  <span className="text-xs text-ink-3">{spots.length} จุด</span>
-                </div>
-                <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-3">
-                  {Object.values(RECENCY).map((r) => (
-                    <span key={r.label} className="flex items-center gap-1.5">
-                      <i className="h-2.5 w-2.5 rounded-full ring-2 ring-white/80" style={{ background: r.color }} />
-                      {r.label}
-                    </span>
-                  ))}
-                </div>
-                {spots.length === 0 && (
-                  <p className="rounded-xl bg-surface-2 p-3 text-sm text-ink-3">
-                    {filterProvince ? `ยังไม่มีผู้แจ้งพบป้ายจังหวัด${filterProvince}` : "ยังไม่มีผู้แจ้งพบป้าย"}
+              <section className="card flex flex-col gap-3 p-4 text-sm">
+                <div>
+                  <b className="text-base">ยังไม่พบป้ายนี้</b>
+                  <p className="mt-1 text-ink-3">
+                    ลองตรวจสอบหมวดอักษรและจังหวัดอีกครั้ง หรือฝากตามหาไว้ — มีผู้แจ้งพบป้ายเพิ่มขึ้นทุกวัน
                   </p>
-                )}
-                {spots.slice(0, listShown).map((r) => (
-                  <div
-                    key={r.id}
-                    ref={(el) => {
-                      if (el) cardRefs.current.set(r.id, el);
-                      else cardRefs.current.delete(r.id);
-                    }}
-                  >
-                    <ReportCard
-                      report={r}
-                      active={selected !== null && r.reportIds.includes(selected)}
-                      onClick={() => select(r.id)}
-                    />
-                  </div>
-                ))}
-                {spots.length > listShown && (
-                  <button
-                    type="button"
-                    className="btn-ghost mt-2 w-full"
-                    onClick={() => setListShown((n) => n + LIST_STEP)}
-                  >
-                    ดูเพิ่มเติม ({Math.min(LIST_STEP, spots.length - listShown)} จาก {spots.length - listShown} จุดที่เหลือ)
-                  </button>
-                )}
+                </div>
+                <button type="button" className="btn-primary self-start" onClick={() => setPopup(true)}>
+                  🔔 ฝากตามหาป้ายนี้
+                </button>
               </section>
             )}
 
-            <DevCredit className="mt-auto pt-2" />
-          </aside>
-        </>
-      )}
+            {mapCard}
+
+            {results.near.length > 0 && (
+              <section className="card flex flex-col gap-2 p-4">
+                <h2 className="text-sm font-bold">
+                  ป้ายที่ใกล้เคียง{" "}
+                  <span className="font-normal text-ink-3">(อาจอ่านผิด 1 ตัว หรือจังหวัดคลาดเคลื่อน)</span>
+                </h2>
+                {results.near.map((h) => (
+                  <HitCard key={h.plate.id} hit={h} active={selected === h.report.id} onShow={() => showHit(h)} />
+                ))}
+              </section>
+            )}
+          </div>
+        )}
+
+        {/* A /จุดพบ link without a search: just that spot on the map. */}
+        {!results && mapCard}
+      </div>
+
+      <DevCredit className="pb-6" />
 
       {welcome && (
         <WelcomeChooser
           onClose={closeWelcome}
           onSearch={() => {
             closeWelcome();
-            setPanelOpen(true);
-            requestAnimationFrame(() => {
-              prefixInput.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-              prefixInput.current?.focus();
-            });
+            focusSearch();
           }}
         />
       )}
 
-      {popup && (
-        <SearchPopup
-          result={popup}
-          onClose={() => setPopup(null)}
-          onShow={showFromPopup}
-          onShowNear={() => {
-            setPopup(null);
-            setPanelOpen(true);
-          }}
-        />
+      {popup && query && (
+        <SearchPopup query={query} nearCount={results?.near.length ?? 0} onClose={() => setPopup(false)} />
       )}
     </div>
   );
 }
 
-/** Announces a search outcome: found (with where to collect it) or not yet. */
+/** Announces that nothing was found yet, and offers to keep looking (watch). */
 function SearchPopup({
-  result,
+  query,
+  nearCount,
   onClose,
-  onShow,
-  onShowNear,
 }: {
-  result: Results & { query: PlateQuery };
+  query: PlateQuery;
+  nearCount: number;
   onClose: () => void;
-  onShow: (h: SearchHit) => void;
-  onShowNear: () => void;
 }) {
-  const { exact, near, query } = result;
-  const found = exact.length > 0;
   const [copied, setCopied] = useState(false);
   const [watchError, setWatchError] = useState(false);
   const [serverForm, setServerForm] = useState(false);
   const [serverCode, setServerCode] = useState("");
   const watches = useWatches();
   const myWatches = useMyWatches();
-  const watched = watches.some(
-    (w) => w.prefix === query.prefix && w.number === query.number && w.province === query.province,
-  );
-  const serverWatched = myWatches.some(
-    (w) => w.prefix === query.prefix && w.number === query.number && w.province === query.province,
-  );
+  const same = (w: PlateQuery) =>
+    w.prefix === query.prefix && w.number === query.number && w.province === query.province;
+  const watched = watches.some(same);
+  const serverWatched = myWatches.some(same);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -468,111 +423,97 @@ function SearchPopup({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
+      className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="search-popup-title"
-        className="card flex max-h-[85vh] w-full max-w-md flex-col gap-3 overflow-y-auto p-4"
+        className="card flex max-h-[85vh] w-full max-w-md flex-col gap-3 overflow-y-auto p-4 shadow-xl"
       >
         <div className="flex items-start gap-3">
-          <div className="text-4xl leading-none">{found ? "🎉" : "🔍"}</div>
+          <div className="text-4xl leading-none">🔍</div>
           <div className="min-w-0 flex-1">
-            <h2 id="search-popup-title" className={`text-lg font-bold ${found ? "text-emerald-400" : ""}`}>
-              {found ? "เจอแล้ว! มีคนพบป้ายของคุณ" : "ยังไม่มีข้อมูลป้ายทะเบียนนี้"}
+            <h2 id="search-popup-title" className="text-lg font-bold">
+              ยังไม่มีข้อมูลป้ายทะเบียนนี้
             </h2>
-            <p className="text-sm text-ink-3">
-              {found
-                ? exact.length > 1
-                  ? `พบ ${exact.length} รายการ ดูจุดรับคืนและช่องทางติดต่อด้านล่าง`
-                  : "ดูจุดรับคืนและช่องทางติดต่อด้านล่าง"
-                : "ยังไม่มีผู้แจ้งพบป้ายนี้ในระบบ"}
-            </p>
+            <p className="text-sm text-ink-3">ยังไม่มีผู้แจ้งพบป้ายนี้ในระบบ</p>
           </div>
           <button type="button" className="icon-btn shrink-0" aria-label="ปิด" onClick={onClose}>
             ✕
           </button>
         </div>
 
-        {!found && (
-          <div className="self-center">
-            <PlateBadge
-              prefix={query.prefix}
-              number={query.number}
-              province={query.province}
-              size="sm"
-              emptyProvince="ทุกจังหวัด"
-            />
-          </div>
+        <div className="self-center">
+          <PlateBadge
+            prefix={query.prefix}
+            number={query.number}
+            province={query.province}
+            size="sm"
+            emptyProvince="ทุกจังหวัด"
+          />
+        </div>
+
+        <ul className="list-disc space-y-1 pl-5 text-sm text-ink-3">
+          <li>ตรวจหมวดอักษร เลขทะเบียน และจังหวัดอีกครั้ง</li>
+          <li>มีผู้แจ้งพบป้ายเพิ่มขึ้นทุกวัน กดฝากตามหาไว้ แล้วเราจะเตือนเมื่อกลับมาเปิดเว็บนี้</li>
+        </ul>
+        {watched ? (
+          <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
+            🔔 ฝากตามหาแล้ว — เมื่อมีคนแจ้งพบป้ายนี้ จะมีแจ้งเตือนตอนคุณกลับมาเปิดเว็บ (ในเครื่องและเบราว์เซอร์นี้)
+          </p>
+        ) : (
+          <button type="button" className="btn-ghost" onClick={() => (addWatch(query) ? null : setWatchError(true))}>
+            🔔 ฝากตามหาแบบเตือนในเบราว์เซอร์นี้
+          </button>
+        )}
+        {watchError && (
+          <p className="text-sm text-warn">เบราว์เซอร์นี้ไม่อนุญาตให้บันทึก (อาจเป็นโหมดไม่ระบุตัวตน) — ใช้ลิงก์ด้านล่างแทน</p>
         )}
 
-        {found ? (
-          exact.map((h) => <HitCard key={h.plate.id} hit={h} active={false} onShow={() => onShow(h)} />)
-        ) : (
-          <>
-            <ul className="list-disc space-y-1 pl-5 text-sm text-ink-3">
-              <li>ตรวจหมวดอักษร เลขทะเบียน และจังหวัดอีกครั้ง</li>
-              <li>มีผู้แจ้งพบป้ายเพิ่มขึ้นทุกวัน กดฝากตามหาไว้ แล้วเราจะเตือนเมื่อกลับมาเปิดเว็บนี้</li>
-            </ul>
-            {watched ? (
-              <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
-                🔔 ฝากตามหาแล้ว — เมื่อมีคนแจ้งพบป้ายนี้ จะมีแจ้งเตือนตอนคุณกลับมาเปิดเว็บ (ในเครื่องและเบราว์เซอร์นี้)
-              </p>
-            ) : (
+        {serverCode ? (
+          <div className="rounded-xl border border-emerald-500/50 bg-emerald-500/10 p-3 text-sm">
+            <b className="text-emerald-400">📮 ฝากตามหาเรียบร้อยแล้ว</b>
+            <p className="mt-1 text-ink-3">เก็บรหัสนี้ไว้สำหรับแก้ไขหรือยกเลิกรายการ</p>
+            <div className="mt-2 flex items-center gap-2">
+              <code className="flex-1 rounded-lg bg-surface px-3 py-2 text-center text-xl font-bold tracking-[0.3em] text-ink">
+                {serverCode}
+              </code>
               <button
                 type="button"
-                className="btn-ghost"
-                onClick={() => (addWatch(query) ? null : setWatchError(true))}
+                className="btn-ghost px-3 py-2 text-sm"
+                onClick={() => navigator.clipboard.writeText(serverCode).catch(() => {})}
               >
-                🔔 ฝากตามหาแบบเตือนในเบราว์เซอร์นี้
-              </button>
-            )}
-            {watchError && (
-              <p className="text-sm text-warn">เบราว์เซอร์นี้ไม่อนุญาตให้บันทึก (อาจเป็นโหมดไม่ระบุตัวตน) — ใช้ลิงก์ด้านล่างแทน</p>
-            )}
-
-            {serverCode ? (
-              <div className="rounded-xl border border-emerald-500/50 bg-emerald-500/10 p-3 text-sm">
-                <b className="text-emerald-400">📮 ฝากตามหาเรียบร้อยแล้ว</b>
-                <p className="mt-1 text-ink-3">เก็บรหัสนี้ไว้สำหรับแก้ไขหรือยกเลิกรายการ</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <code className="flex-1 rounded-lg bg-surface px-3 py-2 text-center text-xl font-bold tracking-[0.3em] text-ink">
-                    {serverCode}
-                  </code>
-                  <button type="button" className="btn-ghost px-3 py-2 text-sm" onClick={() => navigator.clipboard.writeText(serverCode).catch(() => {})}>
-                    คัดลอก
-                  </button>
-                </div>
-                <p className="mt-2 text-xs text-warn">นี่คือรหัสที่คุณกำหนด กรุณาจดเก็บไว้ก่อนปิดหน้าต่าง</p>
-              </div>
-            ) : serverWatched ? (
-              <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
-                📮 ฝากตามหาเรียบร้อยแล้ว — ผู้แจ้งพบป้ายนี้จะเห็นเบอร์คุณและติดต่อกลับได้ทันที
-              </p>
-            ) : serverForm ? (
-              <WatchRequestForm query={query} onDone={setServerCode} />
-            ) : (
-              <button type="button" className="btn-primary" onClick={() => setServerForm(true)}>
-                📮 ฝากตามหา + ทิ้งเบอร์ให้ผู้แจ้งพบติดต่อ
-              </button>
-            )}
-            <div className="flex flex-wrap gap-2">
-              {near.length > 0 && (
-                <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={onShowNear}>
-                  ดูป้ายที่ใกล้เคียง ({near.length})
-                </button>
-              )}
-              <button type="button" className="btn-ghost px-3 py-1.5 text-sm" onClick={copyLink}>
-                {copied ? "✓ คัดลอกลิงก์แล้ว" : "🔗 คัดลอกลิงก์ไว้ค้นหาอีกครั้ง"}
+                คัดลอก
               </button>
             </div>
-          </>
+            <p className="mt-2 text-xs text-warn">นี่คือรหัสที่คุณกำหนด กรุณาจดเก็บไว้ก่อนปิดหน้าต่าง</p>
+          </div>
+        ) : serverWatched ? (
+          <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
+            📮 ฝากตามหาเรียบร้อยแล้ว — ผู้แจ้งพบป้ายนี้จะเห็นเบอร์คุณและติดต่อกลับได้ทันที
+          </p>
+        ) : serverForm ? (
+          <WatchRequestForm query={query} onDone={setServerCode} />
+        ) : (
+          <button type="button" className="btn-primary" onClick={() => setServerForm(true)}>
+            📮 ฝากตามหา + ทิ้งเบอร์ให้ผู้แจ้งพบติดต่อ
+          </button>
         )}
+        <div className="flex flex-wrap gap-2">
+          {nearCount > 0 && (
+            <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={onClose}>
+              ดูป้ายที่ใกล้เคียง ({nearCount})
+            </button>
+          )}
+          <button type="button" className="btn-ghost px-3 py-1.5 text-sm" onClick={copyLink}>
+            {copied ? "✓ คัดลอกลิงก์แล้ว" : "🔗 คัดลอกลิงก์ไว้ค้นหาอีกครั้ง"}
+          </button>
+        </div>
 
         <button type="button" className="btn-ghost" onClick={onClose}>
-          {found ? "ปิด" : "ค้นหาป้ายอื่น"}
+          ค้นหาป้ายอื่น
         </button>
       </div>
     </div>

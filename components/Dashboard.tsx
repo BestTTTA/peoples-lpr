@@ -86,7 +86,7 @@ export default function Dashboard() {
         <Stat label="ป้ายที่แจ้งพบ" value={stats.plates} accent="text-brand" />
         <Stat label="จุดที่พบ" value={stats.points} />
         <Stat label="จังหวัด" value={stats.provinces} />
-        <Stat label="แจ้งใหม่ ≤ 3 วัน" value={stats.fresh} accent="text-[#2fd08b]" />
+        <Stat label="แจ้งใหม่ ≤ 3 วัน" value={stats.fresh} accent="text-emerald-400" />
       </div>
 
       {stats.top.length > 0 && (

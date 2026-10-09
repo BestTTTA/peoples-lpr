@@ -41,15 +41,14 @@ export default function ScamWarningBanner() {
     } catch {}
   }
 
-  // A slim dark bar above the header with a soft amber glow: seen first,
-  // without shouting over the page.
+  // A slim amber-tinted bar above the header: seen first, without shouting over the page.
   return (
     // Above the z-50 popups (welcome, search result), under full-screen views.
     <div
       role="note"
-      className="relative z-[55] border-b border-warn/25 bg-surface bg-[linear-gradient(90deg,rgb(245_165_36/0.16),rgb(245_165_36/0.04)_50%,rgb(245_165_36/0.16))] text-ink"
+      className="relative z-[55] border-b border-warn/20 bg-[#fdf6e3] text-ink"
     >
-      <div className="mx-auto flex max-w-7xl items-center gap-2.5 px-4 py-1.5">
+      <div className="mx-auto flex max-w-[1216px] items-center gap-2.5 px-4 py-1.5">
         <div className="flex min-w-0 flex-1 flex-col items-center">
           <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1">
             <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-warn/20 text-[11px] text-warn ring-1 ring-warn/40">
@@ -62,7 +61,7 @@ export default function ScamWarningBanner() {
             </span>
             <button
               type="button"
-              className="rounded-full border border-line px-2 py-0.5 text-[11px] text-ink-3 transition hover:border-warn/50 hover:text-ink"
+              className="rounded-full border border-warn/30 bg-white/60 px-2 py-0.5 text-[11px] text-ink-3 transition hover:border-warn/60 hover:text-ink"
               aria-expanded={expanded}
               onClick={() => setExpanded((v) => !v)}
             >

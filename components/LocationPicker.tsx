@@ -200,7 +200,7 @@ export default function LocationPicker({
       </div>
       <div className="relative h-[340px] overflow-hidden rounded-xl border border-line">
         <div className="absolute inset-0">
-          <div ref={el} className="h-full w-full bg-[#45516e]" />
+          <div ref={el} className="h-full w-full bg-[#e6eaf0]" />
         </div>
       </div>
       <p className="text-xs text-ink-3">

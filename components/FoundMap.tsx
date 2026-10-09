@@ -236,7 +236,7 @@ export default function FoundMap({
     <div className="relative h-full w-full">
       {/* maplibre-gl.css makes the map container position:relative, so it fills an absolute wrapper. */}
       <div className="absolute inset-0">
-        <div ref={el} className="h-full w-full bg-[#45516e]" />
+        <div ref={el} className="h-full w-full bg-[#e6eaf0]" />
       </div>
     </div>
   );

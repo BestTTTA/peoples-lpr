@@ -1,24 +1,31 @@
 @import "tailwindcss";
 
-/* Dark map-app palette (after the Jetboost CMS Map demo), solid blue accent. */
+/* Light palette: white cards on a soft grey page, one blue accent. */
 @theme {
-  --color-paper: #161616; /* page */
-  --color-surface: #202020; /* panels, cards */
-  --color-surface-2: #2b2b2d; /* inputs, hover, active row */
-  --color-line: #434345;
-  --color-ink: #e7e8ec; /* primary text */
-  --color-ink-3: #a7a8b3; /* secondary text */
+  --color-paper: #f5f6f4; /* page */
+  --color-surface: #ffffff; /* panels, cards */
+  --color-surface-2: #eef2f7; /* hover, active row, tinted panels */
+  --color-line: #dde2e9;
+  --color-ink: #1b2430; /* primary text */
+  --color-ink-3: #5f6b7a; /* secondary text */
   --color-plate: #111111; /* ink on a physical plate */
-  --color-brand: #2f8fe6;
-  --color-brand-dark: #1f74c4;
-  --color-violet: #9b87ff;
-  --color-cyan: #45b8ea;
-  --color-warn: #f5a524;
+  --color-brand: #3a78c2;
+  --color-brand-dark: #2c629f;
+  --color-violet: #6a55d4;
+  --color-cyan: #1f8fc0;
+  --color-warn: #c27803;
   --font-sans: var(--font-plex), system-ui, sans-serif;
+
+  /* Status text was picked for a dark page; these stay readable on white. */
+  --color-emerald-300: #047857;
+  --color-emerald-400: #047857;
+  --color-red-300: #b91c1c;
+  --color-red-400: #dc2626;
+  --color-amber-400: #b45309;
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
@@ -27,7 +34,7 @@ body {
 }
 
 @utility field {
-  @apply w-full rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-base text-ink outline-none transition placeholder:text-ink-3/70 focus:border-brand focus:ring-2 focus:ring-brand/30;
+  @apply w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-base text-ink outline-none transition placeholder:text-ink-3/70 focus:border-brand focus:ring-2 focus:ring-brand/30;
 }
 
 @utility btn {
@@ -56,7 +63,7 @@ body {
   scrollbar-color: var(--color-line) transparent;
 }
 
-/* MapLibre: dark popup and controls (doubled classes to beat maplibre-gl.css). */
+/* MapLibre: popup and controls (doubled classes to beat maplibre-gl.css). */
 .maplibregl-popup .maplibregl-popup-content {
   border: 1px solid var(--color-line);
   border-radius: 14px;
@@ -94,18 +101,12 @@ body {
 .maplibregl-ctrl-group button + button {
   border-top-color: var(--color-line) !important;
 }
-.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
-  filter: invert(1);
-}
 .maplibregl-ctrl-attrib {
-  background: rgb(32 32 32 / 0.8) !important;
+  background: rgb(255 255 255 / 0.85) !important;
   color: var(--color-ink-3);
 }
 .maplibregl-ctrl-attrib a {
   color: var(--color-ink-3) !important;
-}
-.maplibregl-ctrl-attrib-button {
-  filter: invert(1);
 }
 
 .plate-popup-title {

@@ -1,8 +1,8 @@
 "use client";
 import type { Map as MLMap, StyleSpecification } from "maplibre-gl";
 
-// OpenFreeMap "Fiord" — https://openfreemap.org/
-export const MAP_STYLE = "https://tiles.openfreemap.org/styles/fiord";
+// OpenFreeMap "Positron" (light) — https://openfreemap.org/
+export const MAP_STYLE = "https://tiles.openfreemap.org/styles/positron";
 
 // Thailand overview. MapLibre takes [lng, lat].
 export const DEFAULT_CENTER: [number, number] = [100.9, 13.2];
@@ -21,7 +21,7 @@ export function loadMapLibre() {
 export type { MLMap, StyleSpecification };
 
 /**
- * Shared map setup: Fiord style, no rotation. Resolves to null if `signal` aborted while
+ * Shared map setup: Positron style, no rotation. Resolves to null if `signal` aborted while
  * MapLibre was loading — building then removing a map would strip the container's classes
  * from under the map that replaced it (React StrictMode mounts effects twice in dev).
  */
