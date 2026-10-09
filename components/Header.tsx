@@ -49,18 +49,18 @@ export default function Header() {
     path = decodeURIComponent(raw);
   } catch {}
   return (
-    <header className="z-20 border-b border-line bg-surface">
+    <header className="z-20 border-b border-white/10 bg-brand text-white">
       <div className="mx-auto flex max-w-[1216px] items-center gap-3 px-4 py-2.5">
         <Link href="/" className="flex min-w-0 items-center gap-2.5">
           {/* Plain <img>: the logo can change on /admin, and the image optimizer would keep the old one for hours. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/api/branding/logo" alt="" width={44} height={44} className="h-11 w-11 rounded-full bg-white object-cover ring-1 ring-line" />
+          <img src="/api/branding/logo" alt="" width={44} height={44} className="h-11 w-11 rounded-full bg-white object-cover ring-2 ring-white/40" />
           <div className="hidden min-w-0 leading-tight sm:block">
-            <div className="truncate text-lg font-bold tracking-tight text-ink">ตามหาป้ายทะเบียนหาย</div>
-            <div className="truncate text-[11px] text-ink-3">ป้ายทะเบียนหาย.com · Peoples LPR</div>
+            <div className="truncate text-lg font-bold tracking-tight">ตามหาป้ายทะเบียนหาย</div>
+            <div className="truncate text-[11px] text-white/70">ป้ายทะเบียนหาย.com · Peoples LPR</div>
           </div>
         </Link>
-        <nav className="ml-auto flex shrink-0 gap-1 rounded-xl bg-surface-2 p-1">
+        <nav className="ml-auto flex shrink-0 gap-1 rounded-xl bg-white/15 p-1">
           {TABS.map((t) => {
             const active =
               t.href === "/" ? path === "/" || /^\/(ค้นหา|จุดพบ)\//.test(path) : path.startsWith(t.href);
@@ -70,7 +70,7 @@ export default function Header() {
                 href={t.href}
                 aria-current={active ? "page" : undefined}
                 className={`flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-semibold whitespace-nowrap transition sm:px-3.5 ${
-                  active ? "bg-surface text-brand shadow-sm" : "text-ink-3 hover:text-ink"
+                  active ? "bg-white text-brand shadow-sm" : "text-white/80 hover:text-white"
                 }`}
               >
                 {t.icon}

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import DevCredit from "@/components/DevCredit";
+import PageBanner from "@/components/PageBanner";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
 import { timeAgo } from "@/components/ReportCard";
@@ -74,13 +75,12 @@ export default function Dashboard() {
   const filtering = query !== "" || province !== "";
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4">
-      <div>
-        <h1 className="text-xl font-bold">ป้ายทะเบียนที่แจ้งพบ</h1>
-        <p className="text-sm text-ink-3">
-          ทุกป้ายที่มีผู้แจ้งพบ แยกตามจุดที่พบ · แตะป้ายเพื่อดูจุดรับคืนและช่องทางสำหรับติดต่อติดต่อ
-        </p>
-      </div>
+    <>
+      <PageBanner
+        title="ป้ายทะเบียนที่แจ้งพบ"
+        subtitle="ทุกป้ายที่มีผู้แจ้งพบ แยกตามจุดที่พบ · แตะป้ายเพื่อดูจุดรับคืนและช่องทางสำหรับติดต่อ"
+      />
+    <div className="mx-auto -mt-10 flex w-full max-w-6xl flex-col gap-4 px-4 pb-6 sm:-mt-12">
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="ป้ายที่แจ้งพบ" value={stats.plates} accent="text-brand" />
@@ -250,12 +250,13 @@ export default function Dashboard() {
 
       <DevCredit className="pt-4" />
     </div>
+    </>
   );
 }
 
 function Stat({ label, value, accent = "" }: { label: string; value: number; accent?: string }) {
   return (
-    <div className="card p-4">
+    <div className="card p-4 shadow-md">
       <div className={`text-3xl font-bold tabular-nums ${accent}`}>{value.toLocaleString("th-TH")}</div>
       <div className="text-sm text-ink-3">{label}</div>
     </div>

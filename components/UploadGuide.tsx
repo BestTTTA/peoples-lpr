@@ -37,7 +37,7 @@ function Illustration() {
       ].map(([x, y, n]) => (
         <g key={n}>
           <rect x={x} y={y} width="92" height="54" rx="3" fill="#22b8f0" fillOpacity=".15" stroke="#22b8f0" strokeWidth="2.5" />
-          <rect x={x} y={y} width="16" height="14" rx="2" fill="#2f8fe6" />
+          <rect x={x} y={y} width="16" height="14" rx="2" fill="#475ca8" />
           <text x={x + 8} y={y + 11} textAnchor="middle" fontSize="10" fontWeight="700" fill="#fff">
             {n}
           </text>
@@ -72,8 +72,8 @@ const STEPS = [
 export default function UploadGuide() {
   return (
     // Closed by default: the steps below already guide; this is for whoever wants more.
-    <details className="group overflow-hidden rounded-xl open:border open:border-line">
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-1 py-1.5 text-sm text-ink-3 hover:text-ink group-open:px-4 group-open:py-3 group-open:font-semibold group-open:text-ink">
+    <details className="group card overflow-hidden shadow-md">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm text-ink-3 hover:text-ink group-open:font-semibold group-open:text-ink">
         <span className="grid h-5 w-5 place-items-center rounded-full border border-current text-[11px]">?</span>
         ดูวิธีถ่ายรูปและตีกรอบให้ได้ผลดี
         <span className="ml-auto text-ink-3 transition group-open:rotate-180">▾</span>

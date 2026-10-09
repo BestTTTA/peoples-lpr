@@ -8,7 +8,7 @@ export const MAP_STYLE = "https://tiles.openfreemap.org/styles/positron";
 export const DEFAULT_CENTER: [number, number] = [100.9, 13.2];
 export const DEFAULT_ZOOM = 4.8;
 
-export const BRAND = "#2f8fe6";
+export const BRAND = "#475ca8";
 export const HIGHLIGHT = "#f59e0b";
 export const INK = "#2b3336";
 export const FONT = ["Noto Sans Bold"];

@@ -2,16 +2,17 @@
 
 /* Light palette: white cards on a soft grey page, one blue accent. */
 @theme {
-  --color-paper: #f5f6f4; /* page */
+  --color-paper: #f3f5fa; /* page */
   --color-surface: #ffffff; /* panels, cards */
-  --color-surface-2: #eef2f7; /* hover, active row, tinted panels */
-  --color-line: #dde2e9;
-  --color-ink: #1b2430; /* primary text */
-  --color-ink-3: #5f6b7a; /* secondary text */
+  --color-surface-2: #ecf0f8; /* hover, active row, tinted panels */
+  --color-line: #d9dfee;
+  --color-ink: #1c2340; /* primary text */
+  --color-ink-3: #5b6685; /* secondary text */
   --color-plate: #111111; /* ink on a physical plate */
-  --color-brand: #3a78c2;
-  --color-brand-dark: #2c629f;
-  --color-violet: #6a55d4;
+  --color-brand: #475ca8; /* palette 1: indigo */
+  --color-brand-dark: #384a8c;
+  --color-sky: #5981c0; /* palette 2: cornflower */
+  --color-violet: #475ca8;
   --color-cyan: #1f8fc0;
   --color-warn: #c27803;
   --font-sans: var(--font-plex), system-ui, sans-serif;

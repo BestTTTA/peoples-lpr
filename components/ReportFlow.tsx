@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import CropEditor from "@/components/CropEditor";
 import DevCredit from "@/components/DevCredit";
 import LocationPicker, { type LatLng } from "@/components/LocationPicker";
+import PageBanner from "@/components/PageBanner";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
 import UploadGuide from "@/components/UploadGuide";
@@ -387,26 +388,24 @@ export default function ReportFlow() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 p-4 pb-28">
-      <div>
-        <h1 className="text-xl font-bold">แจ้งพบป้ายทะเบียน</h1>
-        <p className="text-sm text-ink-3">ช่วยให้เจ้าของป้ายตามหาเจอ — ใช้เวลาไม่ถึง 2 นาที</p>
-      </div>
+    <>
+      <PageBanner title="แจ้งพบป้ายทะเบียน" subtitle="ช่วยให้เจ้าของป้ายตามหาเจอ — ใช้เวลาไม่ถึง 2 นาที" width="max-w-4xl" compact>
+        <ol className="mt-4 grid grid-cols-3 gap-2">
+          {STEPS.map((s, i) => (
+            <li
+              key={s}
+              className={`rounded-xl px-2 py-2 text-center text-xs font-semibold sm:text-sm ${
+                i === step ? "bg-white text-brand shadow" : i < step ? "bg-white/25 text-white" : "bg-white/10 text-white/80"
+              }`}
+            >
+              {i + 1}. {s}
+            </li>
+          ))}
+        </ol>
+      </PageBanner>
 
+    <div className="mx-auto -mt-6 flex w-full max-w-4xl flex-col gap-4 px-4 pb-28">
       <UploadGuide />
-
-      <ol className="grid grid-cols-3 gap-2">
-        {STEPS.map((s, i) => (
-          <li
-            key={s}
-            className={`rounded-xl px-2 py-2 text-center text-xs font-semibold sm:text-sm ${
-              i === step ? "bg-brand text-white shadow" : i < step ? "bg-brand/10 text-brand" : "bg-surface text-ink-3 border border-line"
-            }`}
-          >
-            {i + 1}. {s}
-          </li>
-        ))}
-      </ol>
 
       {error && <div className="rounded-xl border border-warn/50 bg-warn/10 px-4 py-2.5 text-sm">{error}</div>}
 
@@ -910,6 +909,7 @@ export default function ReportFlow() {
         </div>
       )}
     </div>
+    </>
   );
 }
 

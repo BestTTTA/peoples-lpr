@@ -242,30 +242,30 @@ export default function FindView({
 
   return (
     <div className="dark-scroll flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <section className="border-b border-line bg-surface">
+      <section className="bg-linear-to-b from-brand to-sky text-white">
         <div className="mx-auto w-full max-w-[830px] px-4 py-6 text-center sm:py-9">
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <span className="rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
+            <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
               สำหรับเจ้าของป้ายที่ทำหล่นหรือสูญหาย
             </span>
-            <span className="rounded-full bg-emerald-600/10 px-3 py-1 text-xs font-semibold text-emerald-400">
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-brand">
               ค้นหาฟรี · ไม่เรียกเก็บเงิน
             </span>
           </div>
           <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-5xl">ป้ายของคุณหายใช่ไหม?</h1>
-          <p className="mt-2 text-ink-3 sm:text-lg">
+          <p className="mt-2 text-white/85 sm:text-lg">
             กรอกเลขทะเบียนเพื่อเช็กว่ามีผู้แจ้งพบแล้วหรือยัง ดูตำแหน่งบนแผนที่ และฝากตามหาไว้ได้
           </p>
 
           <form
             onSubmit={search}
             noValidate
-            className="mt-5 rounded-3xl border border-brand/30 bg-surface p-4 text-left shadow-lg ring-4 ring-brand/10 sm:p-5"
+            className="mt-5 rounded-3xl bg-surface p-4 text-left text-ink shadow-xl ring-4 ring-white/25 sm:p-5"
           >
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_230px_auto] md:items-end">
               <label className="text-sm font-medium">
                 <span className="mb-1 flex items-center gap-1.5">
-                  <i className="h-2 w-2 rounded-full bg-violet" /> ทะเบียนรถ
+                  <i className="h-2 w-2 rounded-full bg-sky" /> ทะเบียนรถ
                 </span>
                 <input
                   ref={plateInput}
@@ -311,9 +311,9 @@ export default function FindView({
             {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
           </form>
 
-          <p className="mt-4 text-sm text-ink-3">
+          <p className="mt-4 text-sm text-white/85">
             ส่วนนี้ใช้เมื่อป้ายของคุณหาย · พบหรือเก็บป้ายของผู้อื่นได้?{" "}
-            <Link href={href(REPORT_PATH)} className="font-semibold text-brand underline">
+            <Link href={href(REPORT_PATH)} className="font-semibold text-white underline">
               ไปแจ้งป้ายที่พบ →
             </Link>
           </p>

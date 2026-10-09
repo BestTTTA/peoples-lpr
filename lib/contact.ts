@@ -5,7 +5,7 @@
 export const CHANNEL_TYPES = {
   line: { label: "LINE", color: "#06C755", placeholder: "เช่น @peopleslpr หรือลิงก์ line.me" },
   facebook: { label: "Facebook", color: "#1877F2", placeholder: "ชื่อเพจ หรือลิงก์ facebook.com/…" },
-  phone: { label: "โทรศัพท์", color: "#2f8fe6", placeholder: "เช่น 02-123-4567" },
+  phone: { label: "โทรศัพท์", color: "#5981c0", placeholder: "เช่น 02-123-4567" },
   email: { label: "อีเมล", color: "#EA4335", placeholder: "เช่น contact@example.com" },
   instagram: { label: "Instagram", color: "#E4405F", placeholder: "ชื่อบัญชี หรือลิงก์ instagram.com/…" },
   tiktok: { label: "TikTok", color: "#111111", placeholder: "เช่น @ชื่อบัญชี หรือลิงก์ tiktok.com/…" },
