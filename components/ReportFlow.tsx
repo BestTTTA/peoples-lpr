@@ -82,6 +82,7 @@ export default function ReportFlow() {
   const [note, setNote] = useState("");
   const [contact, setContact] = useState("");
   const [consent, setConsent] = useState(false);
+  const [promptContact, setPromptContact] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   /** After submit: show matches first (owners who ฝากตามหา this plate), then
@@ -305,7 +306,20 @@ export default function ReportFlow() {
     else setError("ไม่มีป้ายที่อ่านได้ครบ — แก้อย่างน้อย 1 ป้ายก่อน");
   }
 
+  /** Pre-submit gate: nudges the finder for a contact if they left it empty, since owners can't reach them otherwise. */
+  function confirm() {
+    if (!consent) return setError("กรุณายินยอมให้เก็บและเผยแพร่ข้อมูลก่อนยืนยัน");
+    if (!location) return setError("กรุณาปักหมุดตำแหน่งที่พบป้าย");
+    if (!contact.trim()) {
+      setError("");
+      setPromptContact(true);
+      return;
+    }
+    submit();
+  }
+
   async function submit() {
+    setPromptContact(false);
     if (!consent) return setError("กรุณายินยอมให้เก็บและเผยแพร่ข้อมูลก่อนยืนยัน");
     if (!location) return setError("กรุณาปักหมุดตำแหน่งที่พบป้าย");
     setError("");
@@ -844,13 +858,57 @@ export default function ReportFlow() {
               type="button"
               className="btn-primary ml-auto"
               disabled={!!busy || !location || !consent}
-              onClick={submit}
+              onClick={confirm}
             >
               ยืนยันและขึ้นแผนที่
             </button>
           )}
         </div>
       </div>
+
+      {promptContact && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="contact-prompt-title"
+          className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
+          onClick={(e) => e.target === e.currentTarget && setPromptContact(false)}
+        >
+          <div className="card flex w-full max-w-md flex-col gap-3 p-5">
+            <h3 id="contact-prompt-title" className="text-lg font-bold">
+              ฝากเบอร์โทรไว้ให้เจ้าของป้ายติดต่อสอบถามเพิ่มเติม
+            </h3>
+            <p className="text-sm text-ink-3">
+              เจ้าของป้ายจะได้โทรหาผู้แจ้งเพื่อนัดรับคืนได้โดยตรง — ช่วยให้ป้ายกลับถึงเจ้าของเร็วขึ้น
+            </p>
+            <input
+              className="field"
+              type="text"
+              maxLength={200}
+              placeholder="เช่น Line ID หรือเบอร์โทร"
+              value={contact}
+              autoFocus
+              onChange={(e) => setContact(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && contact.trim()) submit();
+              }}
+            />
+            <div className="mt-1 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" className="btn-ghost" onClick={submit}>
+                ข้ามและยืนยัน
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={!contact.trim()}
+                onClick={submit}
+              >
+                เพิ่มเบอร์
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
