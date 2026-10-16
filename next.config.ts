@@ -4,6 +4,7 @@ import type { NextConfig } from "next";
 // ASCII routes; these map the Thai paths onto them.
 const REPORT = "/แจ้งพบป้าย";
 const FOUND = "/ป้ายที่พบ";
+const REPLACEMENT_GUIDE = "/วิธีขอป้ายทะเบียนใหม่";
 
 const nextConfig: NextConfig = {
   // Self-contained server for the Docker image (see Dockerfile).
@@ -12,12 +13,14 @@ const nextConfig: NextConfig = {
     return [
       { source: "/report", destination: encodeURI(REPORT), permanent: true },
       { source: "/dashboard", destination: encodeURI(FOUND), permanent: true },
+      { source: "/guide", destination: encodeURI(REPLACEMENT_GUIDE), permanent: true },
     ];
   },
   async rewrites() {
     return [
       { source: encodeURI(REPORT), destination: "/report" },
       { source: encodeURI(FOUND), destination: "/dashboard" },
+      { source: encodeURI(REPLACEMENT_GUIDE), destination: "/guide" },
       // /ค้นหา/3ฒน-5702-กรุงเทพมหานคร → search pre-filled and run
       { source: `${encodeURI("/ค้นหา")}/:plate`, destination: "/?plate=:plate" },
       // /จุดพบ/<report id> → the map focused on that report

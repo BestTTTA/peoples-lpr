@@ -6,6 +6,7 @@ import { filterProvinces, isProvince } from "./provinces";
 
 export const REPORT_PATH = "/แจ้งพบป้าย";
 export const FOUND_PATH = "/ป้ายที่พบ";
+export const REPLACEMENT_GUIDE_PATH = "/วิธีขอป้ายทะเบียนใหม่";
 
 /** /ค้นหา/3ฒน-5702-กรุงเทพมหานคร, or /ค้นหา/3ฒน-5702 for any province */
 export function searchPath(prefix: string, number: string, province: string): string {
