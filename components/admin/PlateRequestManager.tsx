@@ -13,6 +13,8 @@ type ReviewRequest = {
   plateId: string;
   crop: string;
   place: string;
+  reportNote: string;
+  reportContact: string;
   current: PlateText;
   original: PlateText;
   aiDetected: PlateText | null;
@@ -164,6 +166,20 @@ export default function PlateRequestManager() {
                     <p className="mt-2 text-xs text-ink-3">
                       AI อ่านเดิม: {item.aiDetected.raw || `${item.aiDetected.prefix} ${item.aiDetected.number}`} {item.aiDetected.province}
                     </p>
+                  )}
+                  {(item.reportNote || item.reportContact) && (
+                    <div className="mt-2 rounded-lg border border-line px-3 py-2 text-sm">
+                      {item.reportNote && (
+                        <p className="whitespace-pre-wrap break-words">
+                          <span className="text-ink-3">รายละเอียด:</span> {item.reportNote}
+                        </p>
+                      )}
+                      {item.reportContact && (
+                        <p className="break-words">
+                          <span className="text-ink-3">ติดต่อ:</span> {item.reportContact}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

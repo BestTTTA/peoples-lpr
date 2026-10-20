@@ -875,6 +875,8 @@ export type PlateReviewRequest = {
   plateId: string;
   crop: string;
   place: string;
+  reportNote: string;
+  reportContact: string;
   current: PlateText;
   original: PlateText;
   aiDetected: PlateText | null;
@@ -892,6 +894,8 @@ type ReviewRow = {
   plate_id: string;
   crop: string;
   place: string;
+  report_note: string;
+  report_contact: string;
   current_prefix: string;
   current_number: string;
   current_province: string;
@@ -918,6 +922,8 @@ const mapReviewRow = (row: ReviewRow): PlateReviewRequest => ({
   plateId: row.plate_id,
   crop: row.crop,
   place: row.place,
+  reportNote: row.report_note,
+  reportContact: row.report_contact,
   current: { prefix: row.current_prefix, number: row.current_number, province: row.current_province },
   original: { prefix: row.original_prefix, number: row.original_number, province: row.original_province },
   aiDetected:
@@ -952,6 +958,7 @@ export async function listPlateReviewRequests(status: ReviewStatus): Promise<{ r
   await ready();
   const { rows } = await pool().query<ReviewRow>(
     `SELECT f.id, 'FEEDBACK'::text AS kind, f.plate_id, p.crop, r.place,
+            r.note AS report_note, r.contact AS report_contact,
             COALESCE(p.corrected_prefix, p.prefix) AS current_prefix,
             COALESCE(p.corrected_number, p.number) AS current_number,
             COALESCE(p.corrected_province, p.province) AS current_province,
@@ -965,8 +972,8 @@ export async function listPlateReviewRequests(status: ReviewStatus): Promise<{ r
       WHERE f.review_status = $1
       UNION ALL
      SELECT c.id, 'CORRECTION'::text AS kind, c.plate_id, p.crop, r.place,
-            COALESCE(p.corrected_prefix, p.prefix), COALESCE(p.corrected_number, p.number),
-            COALESCE(p.corrected_province, p.province),
+            r.note, r.contact,
+            c.current_prefix, c.current_number, c.current_province,
             p.prefix, p.number, p.province, p.ai_prefix, p.ai_number, p.ai_province, p.ai_raw_plate,
             c.requested_prefix, c.requested_number, c.requested_province,
             NULL::text, c.review_status, c.created_at, c.reviewed_at, c.admin_note
