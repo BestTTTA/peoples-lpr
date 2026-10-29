@@ -19,7 +19,7 @@ import { isProvince } from "@/lib/provinces";
 import type { OcrResult, WatchMatch } from "@/lib/types";
 
 /** AI detection state of a photo; undefined = not asked (manual mode). */
-type Scan = "busy" | "found" | "whole" | "none" | "fail";
+type Scan = "busy" | "found" | "turned" | "whole" | "none" | "fail";
 
 /** A photo this shape is already a close-up of one plate (detectors miss those). */
 const plateShapedPhoto = (p: { width: number; height: number }) => {
@@ -40,6 +40,8 @@ type Photo = {
 };
 
 type CropMode = "auto" | "manual";
+
+const sureness = (boxes: Box[]) => Math.max(0, ...boxes.map((b) => b.conf ?? 0));
 
 type Draft = {
   key: string;
@@ -68,6 +70,8 @@ type Draft = {
 
 // Small requests: a dropped upload on mobile data then costs one retry of a few crops.
 const OCR_BATCH = 8;
+/** Detector confidence below which a photo is also looked at turned. */
+const TURN_BELOW = 0.6;
 /** Degrees of tilt left in a crop from which it is read again straightened. */
 const TILT_MIN = 8;
 const MAX_PHOTOS = 10;
@@ -122,8 +126,37 @@ export default function ReportFlow() {
         found = [{ x: 0, y: 0, w: 1, h: 1, source: "whole" }];
         scan = "whole";
       }
+      // The detector only copes with plates up to ~65° off level: a photo taken sideways or upside
+      // down shows it nothing, or a loose, unsure box. When it is not sure, look at the photo turned
+      // a quarter each way (clockwise, then the opposite way) and keep the turn it is surest about,
+      // so no one has to rotate by hand.
+      let turned: { blob: Blob; width: number; height: number } | undefined;
+      if (scan !== "whole" && sureness(found) < TURN_BELOW) {
+        let view: { blob: Blob; width: number; height: number } = p;
+        let bestSure = sureness(found);
+        for (const quarters of [1, 2]) {
+          for (let i = 0; i < quarters; i++) view = await rotatePhoto(view.blob);
+          const boxes = await detectPlates(view);
+          const sure = sureness(boxes);
+          if (sure > bestSure + 0.1) {
+            turned = view;
+            found = boxes;
+            scan = "turned";
+            bestSure = sure;
+          }
+          if (bestSure >= TURN_BELOW) break;
+        }
+      }
+      const url = turned ? URL.createObjectURL(turned.blob) : "";
       setPhotos((prev) =>
-        prev.map((q) => (q.id !== p.id ? q : { ...q, scan, boxes: q.boxes.length ? q.boxes : found })),
+        prev.map((q) => {
+          if (q.id !== p.id) return q;
+          // The finder drew boxes meanwhile: theirs stand, on the photo as it was.
+          if (q.boxes.length) return { ...q, scan: scan === "turned" ? "found" : scan };
+          if (!turned) return { ...q, scan, boxes: found };
+          URL.revokeObjectURL(q.url);
+          return { ...q, ...turned, url, scan, boxes: found, rejected: [] };
+        }),
       );
     } catch {
       patchPhoto(p.id, { scan: "fail" });
@@ -582,6 +615,8 @@ export default function ReportFlow() {
                     ? "✍️ ลากครอบป้ายทีละป้ายบนรูป"
                     : current?.scan === "busy"
                       ? "🤖 AI กำลังหาป้ายในรูปนี้…"
+                      : current?.scan === "turned"
+                        ? "🤖 หมุนรูปให้ตรงและตีกรอบป้ายให้แล้ว — ตรวจกรอบได้"
                       : current?.scan === "whole"
                         ? "🤖 รูปนี้เป็นป้ายเดียวเต็มรูป — ใช้ทั้งรูปเป็น 1 ป้าย (แก้กรอบได้)"
                         : current?.scan === "none"
