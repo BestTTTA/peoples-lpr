@@ -9,7 +9,8 @@ import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
 import UploadGuide from "@/components/UploadGuide";
 import { clientUuid } from "@/lib/client-uuid";
-import { type Box, cropPlate, detectPlates, preparePhoto, rotateBox, rotatePhoto } from "@/lib/image";
+import { estimateTilt } from "@/lib/deskew";
+import { type Box, cropPlate, detectPlates, preparePhoto, recutLevel, rotateBox, rotatePhoto, sidewaysCrops, upsideDown } from "@/lib/image";
 import { MAX_PLATES } from "@/lib/limits";
 import { postForm } from "@/lib/post";
 import { reportPath } from "@/lib/urls";
@@ -67,6 +68,8 @@ type Draft = {
 
 // Small requests: a dropped upload on mobile data then costs one retry of a few crops.
 const OCR_BATCH = 8;
+/** Degrees of tilt left in a crop from which it is read again straightened. */
+const TILT_MIN = 8;
 const MAX_PHOTOS = 10;
 const PLATE_CONF_OK = 0.85;
 const PROVINCE_CONF_OK = 0.6;
@@ -238,33 +241,92 @@ export default function ReportFlow() {
       }
 
     setBusy(`กำลังอ่านป้ายทะเบียน ${next.length} ป้าย…`);
+    // A tilted plate is also read straightened (cut from the photo again at the tilt
+    // its own lines show, both ways up), and the best reading wins, so no one has to
+    // straighten photos by hand.
+    type Job = { draft: Draft; blob: Blob; turned: boolean };
+    const jobs: Job[] = [];
+    for (const d of next) {
+      jobs.push({ draft: d, blob: d.crop, turned: false });
+      const tilt = await estimateTilt(d.crop);
+      const extra =
+        Math.abs(tilt) >= TILT_MIN
+          ? await recutLevel(photos[d.photo].blob, d.box, tilt)
+          : await sidewaysCrops(d.crop); // lines say level but the crop is tall: try it turned a quarter
+      for (const blob of extra) jobs.push({ draft: d, blob, turned: true });
+    }
     // Each batch stands alone: if one fails, the others still get read.
-    let failed = 0;
+    const readings = new Map<string, { job: Job; r: OcrResult }[]>();
     let lastError = "";
-    for (let i = 0; i < next.length; i += OCR_BATCH) {
-      const chunk = next.slice(i, i + OCR_BATCH);
-      const form = new FormData();
-      chunk.forEach((d) => form.append("file", d.crop, "plate.jpg"));
-      try {
-        const data = await postForm<{ results: OcrResult[] }>("/api/ocr", form);
-        data.results.forEach((r, j) => {
-          const { prefix, number, suspect } = splitPlate(r.plate_number);
-          Object.assign(chunk[j], {
-            prefix,
-            number,
-            suspect,
-            province: isProvince(r.province) ? r.province : "",
-            aiPrefix: prefix,
-            aiNumber: number,
-            aiProvince: isProvince(r.province) ? r.province : "",
-            aiRawPlate: r.plate_number,
-            plateConf: r.plate_confidence,
-            provinceConf: r.province_confidence,
+    async function read(list: Job[]) {
+      for (let i = 0; i < list.length; i += OCR_BATCH) {
+        const chunk = list.slice(i, i + OCR_BATCH);
+        const form = new FormData();
+        chunk.forEach((j) => form.append("file", j.blob, "plate.jpg"));
+        try {
+          const data = await postForm<{ results: OcrResult[] }>("/api/ocr", form);
+          data.results.forEach((r, j) => {
+            const found = readings.get(chunk[j].draft.key) ?? [];
+            found.push({ job: chunk[j], r });
+            readings.set(chunk[j].draft.key, found);
           });
-        });
-      } catch (err) {
-        failed += chunk.length;
-        lastError = err instanceof Error && err.message ? err.message : "อ่านป้ายไม่สำเร็จ";
+        } catch (err) {
+          lastError = err instanceof Error && err.message ? err.message : "อ่านป้ายไม่สำเร็จ";
+        }
+      }
+    }
+    const score = ({ job, r }: { job: Job; r: OcrResult }) => {
+      const { prefix, number } = splitPlate(r.plate_number);
+      // A reading that parses as a plate beats a confident-looking one that does not. The province line
+      // is small and sits under the number, so it only reads well on a plate that is the right way up:
+      // that is what tells a plate from its upside-down twin. Ties keep the original crop.
+      return (
+        r.plate_confidence +
+        0.5 * r.province_confidence +
+        (isValidPrefix(prefix) && isValidNumber(number) ? 0.3 : 0) +
+        (job.turned ? 0 : 0.02)
+      );
+    };
+    const bestOf = (found: { job: Job; r: OcrResult }[]) => found.reduce((a, b) => (score(b) > score(a) ? b : a));
+    await read(jobs);
+    // A plate photographed upside down has no tilt to find: try the unsure ones the other way up.
+    const unsure = next.filter((d) => {
+      const found = readings.get(d.key);
+      if (!found) return false;
+      const { r } = bestOf(found);
+      const { prefix, number } = splitPlate(r.plate_number);
+      return !(isValidPrefix(prefix) && isValidNumber(number)) || r.plate_confidence < PLATE_CONF_OK || r.province_confidence < PROVINCE_CONF_OK;
+    });
+    const flipped: Job[] = [];
+    for (const d of unsure) flipped.push({ draft: d, blob: await upsideDown(d.crop), turned: true });
+    await read(flipped);
+    let failed = 0;
+    for (const d of next) {
+      const found = readings.get(d.key);
+      if (!found) {
+        failed++;
+        continue;
+      }
+      const best = bestOf(found);
+      const { prefix, number, suspect } = splitPlate(best.r.plate_number);
+      const province = isProvince(best.r.province) ? best.r.province : "";
+      Object.assign(d, {
+        prefix,
+        number,
+        suspect,
+        province,
+        aiPrefix: prefix,
+        aiNumber: number,
+        aiProvince: province,
+        aiRawPlate: best.r.plate_number,
+        plateConf: best.r.plate_confidence,
+        provinceConf: best.r.province_confidence,
+      });
+      if (best.job.turned) {
+        // Keep the upright version as the plate's picture, shown here and saved with the report.
+        URL.revokeObjectURL(d.cropUrl);
+        d.crop = best.job.blob;
+        d.cropUrl = URL.createObjectURL(best.job.blob);
       }
     }
     if (failed)
