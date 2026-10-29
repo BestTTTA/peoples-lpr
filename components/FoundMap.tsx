@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { BRAND, FONT, createMap } from "@/lib/maps";
 import { RECENCY, type Recency, pinSvg, recencyOf } from "@/lib/recency";
 import type { PublicReport } from "@/lib/types";
-import { type Spot, toSpots } from "@/lib/spots";
+import { type Spot, pinned, toSpots } from "@/lib/spots";
 import { href, searchPath } from "@/lib/urls";
 
 export type Focus = { lat: number; lng: number; reportIds: string[] };
@@ -58,9 +58,10 @@ function toGeoJSON(reports: PublicReport[]): GeoJSON.FeatureCollection<GeoJSON.P
   return {
     type: "FeatureCollection",
     // One pin per spot, so stacked reports can't hide each other's counts.
-    features: toSpots(reports).map((spot) => ({
+    features: toSpots(pinned(reports)).map((spot) => ({
       type: "Feature",
-      geometry: { type: "Point", coordinates: [spot.lng, spot.lat] },
+      // pinned() left out the reports without coordinates.
+      geometry: { type: "Point", coordinates: [spot.lng as number, spot.lat as number] },
       properties: {
         id: spot.id,
         // Delimited so a filter can test membership with a substring match.
@@ -224,9 +225,9 @@ export default function FoundMap({
     const r = focus.reportIds.length === 1 ? reportsRef.current.find((x) => x.id === focus.reportIds[0]) : undefined;
     if (r && mlRef.current) {
       // The popup covers the whole spot, like the pin does.
-      const spot = toSpots(reportsRef.current).find((x) => x.reportIds.includes(r.id)) ?? { ...r, reportIds: [r.id] };
+      const spot = toSpots(pinned(reportsRef.current)).find((x) => x.reportIds.includes(r.id)) ?? { ...r, reportIds: [r.id] };
       popupRef.current = new mlRef.current.Popup({ offset: 28, maxWidth: "300px" })
-        .setLngLat([spot.lng, spot.lat])
+        .setLngLat([spot.lng as number, spot.lat as number])
         .setHTML(popupHtml(spot))
         .addTo(map);
     }

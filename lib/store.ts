@@ -15,7 +15,7 @@ function env(name: string): string {
 
 // One pool per server process; survive dev hot reloads. (Bump the schema key
 // when ready() gains tables, so a running dev server runs it again.)
-const g = globalThis as unknown as { lprPool?: Pool; lprS3?: S3Client; lprSchemaV8?: Promise<void> };
+const g = globalThis as unknown as { lprPool?: Pool; lprS3?: S3Client; lprSchemaV9?: Promise<void> };
 
 function pool(): Pool {
   g.lprPool ??= new Pool({ connectionString: env("DATABASE_URL"), max: 5 });
@@ -36,7 +36,7 @@ const bucket = () => env("S3_BUCKET");
 
 /** Idempotent schema setup, run once per process before the first query. */
 function ready(): Promise<void> {
-  g.lprSchemaV8 ??= pool()
+  g.lprSchemaV9 ??= pool()
     .query(
       `CREATE TABLE IF NOT EXISTS reports (
          id          uuid PRIMARY KEY,
@@ -178,14 +178,17 @@ function ready(): Promise<void> {
          admin_note         text NOT NULL DEFAULT ''
        );
        CREATE INDEX IF NOT EXISTS plate_correction_review_idx
-         ON plate_correction_requests (review_status, created_at DESC);`,
+         ON plate_correction_requests (review_status, created_at DESC);
+       ALTER TABLE reports ALTER COLUMN lat DROP NOT NULL;
+       ALTER TABLE reports ALTER COLUMN lng DROP NOT NULL;
+       ALTER TABLE reports ADD COLUMN IF NOT EXISTS source_url text NOT NULL DEFAULT '';`,
     )
     .then(() => undefined)
     .catch((err) => {
-      g.lprSchemaV8 = undefined; // retry on the next request
+      g.lprSchemaV9 = undefined; // retry on the next request
       throw err;
     });
-  return g.lprSchemaV8;
+  return g.lprSchemaV9;
 }
 
 type StoredPlateRow = Plate & {
@@ -204,11 +207,12 @@ type StoredPlateRow = Plate & {
 type Row = {
   id: string;
   created_at: Date;
-  lat: number;
-  lng: number;
+  lat: number | null;
+  lng: number | null;
   place: string;
   note: string;
   contact: string;
+  source_url: string;
   photos: string[];
   extra_boxes: ExtraBox[] | null;
   plates: StoredPlateRow[] | null;
@@ -244,6 +248,7 @@ export async function listReports(includeInactive = false): Promise<Report[]> {
     place: r.place,
     note: r.note,
     contact: r.contact,
+    sourceUrl: r.source_url,
     photos: r.photos,
     extraBoxes: r.extra_boxes ?? [],
     plates: (r.plates ?? []).map((p) => ({
@@ -271,8 +276,8 @@ export async function addReport(report: Report): Promise<void> {
   try {
     await client.query("BEGIN");
     await client.query(
-      `INSERT INTO reports (id, created_at, lat, lng, place, note, contact, photos, extra_boxes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      `INSERT INTO reports (id, created_at, lat, lng, place, note, contact, source_url, photos, extra_boxes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         report.id,
         report.createdAt,
@@ -281,6 +286,7 @@ export async function addReport(report: Report): Promise<void> {
         report.place ?? "",
         report.note,
         report.contact,
+        report.sourceUrl,
         report.photos,
         JSON.stringify(report.extraBoxes ?? []),
       ],

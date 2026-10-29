@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
+import Linkified from "@/components/Linkified";
 import PhotoViewer from "@/components/PhotoViewer";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
@@ -108,37 +109,57 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
         <span className="min-w-0 flex-1">
           <PlateBadge prefix={displayPlate.prefix} number={displayPlate.number} province={displayPlate.province} size="sm" />
           <span className="mt-1 line-clamp-2 text-sm text-ink-3">
-            {report.place || `${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}`}
+            {report.place ||
+              (report.lat !== null && report.lng !== null
+                ? `${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}`
+                : "ไม่ได้ปักหมุด — ดูจุดรับคืนด้านล่าง")}
           </span>
           <span className="block text-xs text-ink-3/80">พบ {timeAgo(report.createdAt)}</span>
         </span>
       </button>
-      {(report.note || report.contact) && (
+      {(report.note || report.contact || report.sourceUrl) && (
         <div className="rounded-lg border border-line px-3 py-2 text-sm">
           {report.note && (
             <p>
-              <span className="text-ink-3">จุดรับคืน:</span> {report.note}
+              <span className="text-ink-3">จุดรับคืน:</span> <Linkified text={report.note} />
             </p>
           )}
           {report.contact && (
             <p>
-              <span className="text-ink-3">ติดต่อ:</span> {report.contact}
+              <span className="text-ink-3">ติดต่อ:</span> <Linkified text={report.contact} />
+            </p>
+          )}
+          {report.sourceUrl && (
+            <p className="break-all">
+              <span className="text-ink-3">โพสต์ต้นทาง:</span>{" "}
+              <a
+                href={report.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer nofollow ugc"
+                className="font-semibold text-brand underline"
+              >
+                ดูโพสต์ต้นทาง ↗
+              </a>
             </p>
           )}
         </div>
       )}
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={onShow}>
-          📍 ดูบนแผนที่
-        </button>
-        <a
-          className="btn-ghost px-3 py-1.5 text-sm"
-          href={`https://www.google.com/maps/dir/?api=1&destination=${report.lat},${report.lng}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          นำทาง
-        </a>
+        {report.lat !== null && report.lng !== null && (
+          <>
+            <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={onShow}>
+              📍 ดูบนแผนที่
+            </button>
+            <a
+              className="btn-ghost px-3 py-1.5 text-sm"
+              href={`https://www.google.com/maps/dir/?api=1&destination=${report.lat},${report.lng}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              นำทาง
+            </a>
+          </>
+        )}
         {photo && (
           <button type="button" className="btn-ghost px-3 py-1.5 text-sm" onClick={() => setViewing(`/api/files/${photo}`)}>
             รูปเต็ม

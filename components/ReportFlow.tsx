@@ -13,7 +13,8 @@ import { estimateTilt } from "@/lib/deskew";
 import { type Box, cropPlate, detectPlates, preparePhoto, recutLevel, rotateBox, rotatePhoto, sidewaysCrops, upsideDown } from "@/lib/image";
 import { MAX_PLATES } from "@/lib/limits";
 import { postForm } from "@/lib/post";
-import { reportPath } from "@/lib/urls";
+import { normalizeSourceUrl } from "@/lib/source-url";
+import { reportPath, searchPath } from "@/lib/urls";
 import { clean, isValidNumber, isValidPrefix, numberProblem, prefixProblem, splitPlate } from "@/lib/plate";
 import { isProvince } from "@/lib/provinces";
 import type { OcrResult, WatchMatch } from "@/lib/types";
@@ -89,6 +90,9 @@ export default function ReportFlow() {
   const [location, setLocation] = useState<LatLng | null>(null);
   const [note, setNote] = useState("");
   const [contact, setContact] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
+  /** No pin: the pickup note is the only place information. */
+  const [noPin, setNoPin] = useState(false);
   const [consent, setConsent] = useState(false);
   const [promptContact, setPromptContact] = useState(false);
   const [busy, setBusy] = useState("");
@@ -403,9 +407,27 @@ export default function ReportFlow() {
   }
 
   /** Pre-submit gate: nudges the finder for a contact if they left it empty, since owners can't reach them otherwise. */
+  const noteOk = note.trim().length >= 5;
+  const sourceUrlBad = sourceUrl.trim() !== "" && normalizeSourceUrl(sourceUrl) === null;
+
+  /** What is still missing before the report can be sent; "" when it is ready. */
+  function formProblem(): string {
+    if (!consent) return "กรุณายินยอมให้เก็บและเผยแพร่ข้อมูลก่อนยืนยัน";
+    if (noPin ? !noteOk : !location)
+      return noPin ? "กรุณาระบุจุดรับคืนเป็นข้อความ (อย่างน้อย 5 ตัวอักษร)" : "กรุณาปักหมุดตำแหน่งที่พบป้าย";
+    if (sourceUrlBad) return "ลิงก์โพสต์ต้นทางต้องเป็นลิงก์เว็บ เช่น https://facebook.com/…";
+    return "";
+  }
+
+  /** Where to go once saved: the pin on the map, or (no pin) the search page that shows the pickup note. */
+  function afterSave(id: string) {
+    const first = kept[0];
+    return noPin && first ? searchPath(clean(first.prefix), clean(first.number), first.province) : reportPath(id);
+  }
+
   function confirm() {
-    if (!consent) return setError("กรุณายินยอมให้เก็บและเผยแพร่ข้อมูลก่อนยืนยัน");
-    if (!location) return setError("กรุณาปักหมุดตำแหน่งที่พบป้าย");
+    const problem = formProblem();
+    if (problem) return setError(problem);
     if (!contact.trim()) {
       setError("");
       setPromptContact(true);
@@ -416,8 +438,8 @@ export default function ReportFlow() {
 
   async function submit() {
     setPromptContact(false);
-    if (!consent) return setError("กรุณายินยอมให้เก็บและเผยแพร่ข้อมูลก่อนยืนยัน");
-    if (!location) return setError("กรุณาปักหมุดตำแหน่งที่พบป้าย");
+    const problem = formProblem();
+    if (problem) return setError(problem);
     setError("");
     setBusy("กำลังบันทึก…");
     // Only send photos that still have at least one plate, and re-index.
@@ -426,10 +448,11 @@ export default function ReportFlow() {
     form.append(
       "meta",
       JSON.stringify({
-        lat: location.lat,
-        lng: location.lng,
+        lat: noPin ? null : (location?.lat ?? null),
+        lng: noPin ? null : (location?.lng ?? null),
         note: note.trim(),
         contact: contact.trim(),
+        sourceUrl: normalizeSourceUrl(sourceUrl) ?? "",
         plates: kept.map((d) => ({
           prefix: clean(d.prefix),
           number: clean(d.number),
@@ -459,7 +482,7 @@ export default function ReportFlow() {
       const data = await postForm<{ id: string; matches?: WatchMatch[] }>("/api/reports", form, 1);
       const matches = data.matches ?? [];
       if (matches.length === 0) {
-        router.push(reportPath(data.id));
+        router.push(afterSave(data.id));
         return;
       }
       // Hold on the success screen so the finder can see the owner's contact
@@ -477,7 +500,8 @@ export default function ReportFlow() {
       <ReportSuccess
         matches={success.matches}
         reportedPlates={kept.map((d) => ({ prefix: clean(d.prefix), number: clean(d.number), province: d.province }))}
-        onContinue={() => router.push(reportPath(success.reportId))}
+        noPin={noPin}
+        onContinue={() => router.push(afterSave(success.reportId))}
       />
     );
   }
@@ -858,11 +882,30 @@ export default function ReportFlow() {
         <section className="card flex flex-col gap-4 p-4">
           <div>
             <h2 className="font-semibold">ตำแหน่งที่พบป้าย / จุดรับคืน</h2>
-            <p className="text-sm text-ink-3">ผู้ค้นหาจะเห็นหมุดนี้บนแผนที่</p>
+            <p className="text-sm text-ink-3">
+              {noPin
+                ? "รายงานนี้จะไม่มีหมุดบนแผนที่ ผู้ที่ค้นเจอป้ายจะเห็นเฉพาะข้อความจุดรับคืนด้านล่าง"
+                : "ผู้ค้นหาจะเห็นหมุดนี้บนแผนที่"}
+            </p>
           </div>
-          <LocationPicker value={location} onChange={setLocation} />
+          <label className="flex items-start gap-2 rounded-xl border border-line bg-surface-2/60 px-3 py-2.5 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+              checked={noPin}
+              onChange={(e) => setNoPin(e.target.checked)}
+            />
+            <span>
+              <b>ไม่ปักหมุด</b>
+              <span className="text-ink-3"> — ระบุจุดรับคืนเป็นข้อความอย่างเดียว (เช่น “ฝากไว้ที่ร้านค้าหน้าซอย…”)</span>
+            </span>
+          </label>
+          {!noPin && <LocationPicker value={location} onChange={setLocation} />}
           <label className="text-sm font-medium">
-            จุดรับคืน / หมายเหตุ <span className="font-normal text-ink-3">(แนะนำ)</span>
+            จุดรับคืน / หมายเหตุ{" "}
+            <span className={noPin ? "font-semibold text-warn" : "font-normal text-ink-3"}>
+              {noPin ? "(จำเป็น เมื่อไม่ปักหมุด)" : "(แนะนำ)"}
+            </span>
             <textarea
               className="field mt-1 min-h-20"
               maxLength={500}
@@ -880,6 +923,21 @@ export default function ReportFlow() {
               value={contact}
               onChange={(e) => setContact(e.target.value)}
             />
+          </label>
+          <label className="text-sm font-medium">
+            ลิงก์โพสต์ต้นทาง{" "}
+            <span className="font-normal text-ink-3">
+              (ไม่บังคับ — เช่น ลิงก์ Facebook ที่โพสต์ประกาศเจอป้ายนี้ · แสดงเฉพาะผู้ที่ค้นเจอป้ายตรงกัน)
+            </span>
+            <input
+              className={`field mt-1 ${sourceUrlBad ? "border-red-500" : ""}`}
+              inputMode="url"
+              maxLength={500}
+              placeholder="เช่น https://www.facebook.com/…"
+              value={sourceUrl}
+              onChange={(e) => setSourceUrl(e.target.value)}
+            />
+            {sourceUrlBad && <span className="mt-1 block text-xs font-normal text-red-400">ต้องเป็นลิงก์เว็บ เช่น https://facebook.com/…</span>}
           </label>
           <div className="flex flex-wrap gap-1.5">
             {drafts.map((d) => (
@@ -935,9 +993,13 @@ export default function ReportFlow() {
                     : `อีก ${kept.filter((d) => !draftValid(d)).length} ป้ายยังไม่ครบ — แก้ช่องสีแดง หรือกดข้าม`
                   : !consent
                     ? "ติ๊กยินยอมก่อนจึงจะยืนยันได้"
-                    : location
-                      ? "พร้อมยืนยัน"
-                      : "ยังไม่ได้ปักหมุด")}
+                    : noPin
+                      ? noteOk
+                        ? "พร้อมยืนยัน (ไม่ปักหมุด)"
+                        : "ระบุจุดรับคืนก่อน"
+                      : location
+                        ? "พร้อมยืนยัน"
+                        : "ยังไม่ได้ปักหมุด")}
           </span>
           {step === 0 && (
             <button type="button" className="btn-primary ml-auto" disabled={!!busy || boxCount === 0} onClick={readPlates}>
@@ -953,10 +1015,10 @@ export default function ReportFlow() {
             <button
               type="button"
               className="btn-primary ml-auto"
-              disabled={!!busy || !location || !consent}
+              disabled={!!busy || !consent || (noPin ? !noteOk : !location)}
               onClick={confirm}
             >
-              ยืนยันและขึ้นแผนที่
+              {noPin ? "ยืนยันและบันทึก" : "ยืนยันและขึ้นแผนที่"}
             </button>
           )}
         </div>
@@ -1032,16 +1094,18 @@ function storedBox(b: Box) {
 function ReportSuccess({
   matches,
   reportedPlates,
+  noPin,
   onContinue,
 }: {
   matches: WatchMatch[];
   reportedPlates: { prefix: string; number: string; province: string }[];
+  noPin: boolean;
   onContinue: () => void;
 }) {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 p-4 pb-24">
       <p className="text-sm text-emerald-400">
-        ✓ บันทึกแล้ว · {reportedPlates.length} ป้ายขึ้นแผนที่ · มีเจ้าของตามหา{" "}
+        ✓ บันทึกแล้ว · {reportedPlates.length} ป้าย{noPin ? "ขึ้นรายการ (ไม่มีหมุดบนแผนที่)" : "ขึ้นแผนที่"} · มีเจ้าของตามหา{" "}
         <b>{matches.length}</b> คน
       </p>
 
@@ -1078,7 +1142,7 @@ function ReportSuccess({
       </div>
 
       <button type="button" className="btn-ghost self-center" onClick={onContinue}>
-        ไปที่จุดรับคืนบนแผนที่ →
+        {noPin ? "ดูรายงานของคุณ →" : "ไปที่จุดรับคืนบนแผนที่ →"}
       </button>
     </div>
   );

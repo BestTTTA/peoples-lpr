@@ -11,7 +11,12 @@ export type Spot = PublicReport & {
 };
 
 /** 4 decimals of lat/lng ≈ 11 m. */
-const spotKey = (r: { lat: number; lng: number }) => `${r.lat.toFixed(4)},${r.lng.toFixed(4)}`;
+/** A report without a pin is a spot of its own: nothing to merge it with. */
+const spotKey = (r: { id: string; lat: number | null; lng: number | null }) =>
+  r.lat === null || r.lng === null ? `nopin:${r.id}` : `${r.lat.toFixed(4)},${r.lng.toFixed(4)}`;
+
+/** Reports that have a pin, i.e. can be drawn on the map. */
+export const pinned = (reports: PublicReport[]) => reports.filter((r) => r.lat !== null && r.lng !== null);
 
 /** Spots, newest first; each takes its place, time and position from its newest report. */
 export function toSpots(reports: PublicReport[]): Spot[] {

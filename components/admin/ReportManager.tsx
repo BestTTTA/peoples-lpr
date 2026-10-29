@@ -5,6 +5,7 @@ import PhotoViewer from "@/components/PhotoViewer";
 import PlateBadge from "@/components/PlateBadge";
 import type { Report } from "@/lib/types";
 import { href, reportPath } from "@/lib/urls";
+import Linkified from "@/components/Linkified";
 
 type Page = { total: number; page: number; pageSize: number; reports: Report[] };
 
@@ -125,15 +126,25 @@ export default function ReportManager() {
                   <div className="font-semibold">
                     {r.plates.length} ป้าย · {dateFmt.format(new Date(r.createdAt))}
                   </div>
-                  <div className="text-ink-3">{r.place || `${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}`}</div>
+                  <div className="text-ink-3">
+                    {r.place || (r.lat !== null && r.lng !== null ? `${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}` : "ไม่ได้ปักหมุด")}
+                  </div>
+                  {r.sourceUrl && (
+                    <div className="break-all">
+                      <span className="text-ink-3">โพสต์ต้นทาง:</span>{" "}
+                      <a href={r.sourceUrl} target="_blank" rel="noopener noreferrer nofollow ugc" className="text-brand underline">
+                        {r.sourceUrl}
+                      </a>
+                    </div>
+                  )}
                   {r.note && (
                     <div className="mt-1">
-                      <span className="text-ink-3">หมายเหตุ:</span> {r.note}
+                      <span className="text-ink-3">หมายเหตุ:</span> <Linkified text={r.note} />
                     </div>
                   )}
                   {r.contact && (
                     <div>
-                      <span className="text-ink-3">ติดต่อ:</span> {r.contact}
+                      <span className="text-ink-3">ติดต่อ:</span> <Linkified text={r.contact} />
                     </div>
                   )}
                 </div>
@@ -237,12 +248,14 @@ function MoveDialog({
   onClose: () => void;
   onMoved: (m: { id: string; lat: number; lng: number; place: string }) => void;
 }) {
-  const [at, setAt] = useState<LatLng>({ lat: report.lat, lng: report.lng });
+  const original: LatLng | null = report.lat !== null && report.lng !== null ? { lat: report.lat, lng: report.lng } : null;
+  const [at, setAt] = useState<LatLng | null>(original);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const changed = at.lat !== report.lat || at.lng !== report.lng;
+  const changed = at !== null && (!original || at.lat !== original.lat || at.lng !== original.lng);
 
   async function save() {
+    if (!at) return;
     setBusy(true);
     setError("");
     const res = await fetch(`/api/admin/reports/${report.id}`, {
@@ -263,7 +276,7 @@ function MoveDialog({
           <div className="min-w-0">
             <h3 className="font-bold">แก้ตำแหน่งจุดที่พบ</h3>
             <p className="truncate text-sm text-ink-3">
-              {report.plates.length} ป้าย · ตอนนี้: {report.place || `${report.lat.toFixed(5)}, ${report.lng.toFixed(5)}`}
+              {report.plates.length} ป้าย · ตอนนี้: {report.place || (original ? `${original.lat.toFixed(5)}, ${original.lng.toFixed(5)}` : "ไม่ได้ปักหมุด")}
             </p>
           </div>
           <button type="button" className="icon-btn shrink-0" aria-label="ปิด" onClick={onClose}>
@@ -276,7 +289,7 @@ function MoveDialog({
           <button type="button" className="btn-primary" disabled={!changed || busy} onClick={save}>
             {busy ? "กำลังบันทึก…" : "บันทึกตำแหน่งใหม่"}
           </button>
-          <button type="button" className="btn-ghost" onClick={() => setAt({ lat: report.lat, lng: report.lng })} disabled={!changed}>
+          <button type="button" className="btn-ghost" onClick={() => setAt(original)} disabled={!changed}>
             กลับตำแหน่งเดิม
           </button>
           <span className="text-xs text-ink-3">ชื่อสถานที่จะอัปเดตตามตำแหน่งใหม่ให้อัตโนมัติ</span>

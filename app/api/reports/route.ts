@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { sanitizeBox, sanitizeExtraBoxes } from "@/lib/boxes";
 import { MAX_PLATES } from "@/lib/limits";
+import { normalizeSourceUrl } from "@/lib/source-url";
 import { clean, isValidNumber, isValidPrefix } from "@/lib/plate";
 import { isProvince } from "@/lib/provinces";
 import { reverseGeocode } from "@/lib/geocode";
@@ -25,10 +26,12 @@ export async function GET() {
 }
 
 type Meta = {
-  lat: number;
-  lng: number;
+  /** null/absent for a report with a pickup note only (no pin). */
+  lat?: number | null;
+  lng?: number | null;
   note?: string;
   contact?: string;
+  sourceUrl?: string;
   plates: {
     prefix: string;
     number: string;
@@ -63,9 +66,19 @@ export async function POST(request: Request) {
   const photos = form.getAll("photo");
   const crops = form.getAll("crop");
 
-  const { lat, lng } = meta;
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180)
-    return bad("กรุณาปักหมุดตำแหน่ง");
+  const note = String(meta.note ?? "").trim().slice(0, 500);
+  const noPin = meta.lat == null && meta.lng == null;
+  const lat = noPin ? null : Number(meta.lat);
+  const lng = noPin ? null : Number(meta.lng);
+  if (lat !== null && lng !== null) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180)
+      return bad("ตำแหน่งที่ปักหมุดไม่ถูกต้อง");
+  } else if (noPin) {
+    // Without a pin the note is the only way to say where the plates can be collected.
+    if (note.length < 5) return bad("กรุณาปักหมุด หรือระบุจุดรับคืนเป็นข้อความ");
+  } else return bad("ตำแหน่งที่ปักหมุดไม่ถูกต้อง");
+  const sourceUrl = normalizeSourceUrl(String(meta.sourceUrl ?? ""));
+  if (sourceUrl === null) return bad("ลิงก์โพสต์ต้นทางต้องเป็นลิงก์เว็บ เช่น https://facebook.com/…");
   if (!Array.isArray(meta.plates) || meta.plates.length === 0) return bad("ไม่มีป้ายทะเบียน");
   if (meta.plates.length > MAX_PLATES) return bad(`ส่งได้สูงสุด ${MAX_PLATES} ป้าย`);
   if (photos.length === 0 || photos.length > MAX_PHOTOS) return bad("จำนวนรูปไม่ถูกต้อง");
@@ -118,9 +131,10 @@ export async function POST(request: Request) {
     createdAt: new Date().toISOString(),
     lat,
     lng,
-    place: await reverseGeocode(lat, lng),
-    note: String(meta.note ?? "").slice(0, 500),
+    place: lat !== null && lng !== null ? await reverseGeocode(lat, lng) : "",
+    note,
     contact: String(meta.contact ?? "").slice(0, 200),
+    sourceUrl,
     photos: photoNames,
     plates,
     extraBoxes: sanitizeExtraBoxes(meta.extraBoxes, photoNames.length),

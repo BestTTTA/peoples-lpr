@@ -102,12 +102,13 @@ export default function FindView({
 
   function select(id: string) {
     const r = mapReports.find((x) => x.id === id);
-    if (!r) return;
+    if (!r || r.lat === null || r.lng === null) return;
     setSelected(id);
     setFocus({ lat: r.lat, lng: r.lng, reportIds: [id] });
   }
 
   const showHit = (h: SearchHit) => {
+    if (h.report.lat === null || h.report.lng === null) return;
     scrollToMap.current = true;
     setSelected(h.report.id);
     setFocus({ lat: h.report.lat, lng: h.report.lng, reportIds: [h.report.id] });
@@ -134,15 +135,18 @@ export default function FindView({
       if (!res.ok) throw new Error(data.error);
       setResults(data);
       const hits = data.exact as SearchHit[];
-      // No exact match: still put the closest ones on the map.
-      const first = hits[0] ?? (data.near as SearchHit[])[0];
+      // No exact match: still put the closest ones on the map. Reports left without a pin have
+      // nothing to show there; their pickup note is in the list.
+      const pinnedHit = (h: SearchHit) => h.report.lat !== null && h.report.lng !== null;
+      const exactOnMap = hits.filter(pinnedHit);
+      const first = exactOnMap[0] ?? (data.near as SearchHit[]).find(pinnedHit);
       setPopup(!hits[0]);
-      if (first) {
+      if (first && first.report.lat !== null && first.report.lng !== null) {
         setSelected(first.report.id);
         setFocus({
           lat: first.report.lat,
           lng: first.report.lng,
-          reportIds: hits[0] ? hits.map((h) => h.report.id) : [first.report.id],
+          reportIds: exactOnMap[0] ? exactOnMap.map((h) => h.report.id) : [first.report.id],
         });
       } else {
         setSelected(null);
@@ -163,7 +167,7 @@ export default function FindView({
       .then((data: PublicReport[]) => {
         setReports(data);
         const r = data.find((x) => x.id === initialReport.reportId);
-        const at = r ? { lat: r.lat, lng: r.lng } : initialReport.at;
+        const at = r ? (r.lat !== null && r.lng !== null ? { lat: r.lat, lng: r.lng } : null) : initialReport.at;
         if (at) {
           setFocus({ ...at, reportIds: [initialReport.reportId] });
           setSelected(initialReport.reportId);

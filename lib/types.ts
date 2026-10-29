@@ -35,13 +35,16 @@ export type Plate = {
 export type Report = {
   id: string;
   createdAt: string;
-  lat: number;
-  lng: number;
+  /** The pin; null when the finder gave a pickup note only. */
+  lat: number | null;
+  lng: number | null;
   /** Reverse-geocoded place name for the pin; "" if lookup failed. */
   place?: string;
   /** Where the plates are now / how to collect them. */
   note: string;
   contact: string;
+  /** Link to the post the plates were first announced in ("" if none). */
+  sourceUrl: string;
   photos: string[];
   plates: Plate[];
   /** AI boxes the finder deleted and plates boxed but left out (training data). */
@@ -52,14 +55,14 @@ export type Report = {
 export type PublicReport = {
   id: string;
   createdAt: string;
-  lat: number;
-  lng: number;
+  lat: number | null;
+  lng: number | null;
   place: string;
   plates: { prefix: string; number: string; province: string }[];
 };
 
 export type SearchHit = {
-  report: Pick<Report, "id" | "createdAt" | "lat" | "lng" | "place" | "note" | "contact" | "photos">;
+  report: Pick<Report, "id" | "createdAt" | "lat" | "lng" | "place" | "note" | "contact" | "sourceUrl" | "photos">;
   plate: Plate;
 };
 

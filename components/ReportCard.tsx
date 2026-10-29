@@ -69,7 +69,10 @@ export default function ReportCard({
           พบ {report.plates.length} ป้าย · {prefixes}
         </span>
         <span className="line-clamp-2 text-sm text-ink-3">
-          {report.place || `${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}`}
+          {report.place ||
+            (report.lat !== null && report.lng !== null
+              ? `${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}`
+              : "ไม่ได้ปักหมุด")}
         </span>
         <span className="block text-xs text-ink-3/80">{timeAgo(report.createdAt)}</span>
       </span>

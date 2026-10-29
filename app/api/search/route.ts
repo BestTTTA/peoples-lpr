@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       place: r.place ?? "",
       note: r.note,
       contact: r.contact,
+      sourceUrl: r.sourceUrl,
       photos: r.photos,
     };
     for (const p of r.plates) {

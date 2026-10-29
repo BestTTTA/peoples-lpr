@@ -182,7 +182,10 @@ export default function Dashboard() {
                 />
                 <div className="min-w-0 flex-1">
                   <h3 className="line-clamp-2 font-semibold">
-                    {report.place || `${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}`}
+                    {report.place ||
+                      (report.lat !== null && report.lng !== null
+                        ? `${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}`
+                        : "ไม่ได้ปักหมุด — แตะป้ายเพื่อดูจุดรับคืน")}
                   </h3>
                   <p className="text-xs text-ink-3">
                     {times > 1 ? `แจ้ง ${times} ครั้ง · ล่าสุด ` : "แจ้งพบ "}
@@ -224,19 +227,21 @@ export default function Dashboard() {
                 </button>
               )}
 
-              <footer className="mt-auto flex flex-wrap gap-2">
-                <Link href={href(reportPath(report.id))} className="btn-ghost px-3 py-1.5 text-sm">
-                  📍 ดูบนแผนที่
-                </Link>
-                <a
-                  className="btn-ghost px-3 py-1.5 text-sm"
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${report.lat},${report.lng}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  นำทาง
-                </a>
-              </footer>
+              {report.lat !== null && report.lng !== null && (
+                <footer className="mt-auto flex flex-wrap gap-2">
+                  <Link href={href(reportPath(report.id))} className="btn-ghost px-3 py-1.5 text-sm">
+                    📍 ดูบนแผนที่
+                  </Link>
+                  <a
+                    className="btn-ghost px-3 py-1.5 text-sm"
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${report.lat},${report.lng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    นำทาง
+                  </a>
+                </footer>
+              )}
             </article>
           );
         })}
