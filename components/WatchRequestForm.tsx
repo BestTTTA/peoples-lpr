@@ -1,5 +1,6 @@
 "use client";
 import { useId, useState } from "react";
+import { useLanguage } from "@/components/LanguageProvider";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
 import { clientUuid } from "@/lib/client-uuid";
@@ -19,6 +20,7 @@ const SITE_NAME = "ป้ายทะเบียนหาย.com";
  * owner can cancel without an account.
  */
 export default function WatchRequestForm({ query, onDone }: { query: PlateQuery; onDone: (managementCode: string) => void }) {
+  const { t } = useLanguage();
   const consentId = useId();
   const [prefix, setPrefix] = useState(query.prefix);
   const [number, setNumber] = useState(query.number);
@@ -82,9 +84,9 @@ export default function WatchRequestForm({ query, onDone }: { query: PlateQuery;
   return (
     <form onSubmit={submit} className="flex flex-col gap-3 rounded-2xl border border-brand/40 bg-brand/5 p-4" noValidate>
       <div>
-        <h3 className="text-base font-bold">📮 ฝากตามหาป้ายนี้ (มีเบอร์ติดต่อ)</h3>
+        <h3 className="text-base font-bold">{t("📮 ฝากตามหาป้ายนี้ (มีเบอร์ติดต่อ)", "📮 Create an alert with contact details")}</h3>
         <p className="mt-1 text-xs text-ink-3">
-          เบอร์ของคุณจะแสดงให้เฉพาะผู้แจ้งพบป้ายนี้เท่านั้น ไม่แสดงบนหน้าเว็บ และเลขป้ายที่ฝากไว้จะไม่ประกาศต่อสาธารณะ
+          {t("เบอร์ของคุณจะแสดงให้เฉพาะผู้แจ้งพบป้ายนี้เท่านั้น ไม่แสดงบนหน้าเว็บ และเลขป้ายที่ฝากไว้จะไม่ประกาศต่อสาธารณะ", "Your phone number is shown only to someone who reports this exact plate. It is not displayed publicly, and the plate in this alert is not listed on the website.")}
         </p>
       </div>
 
@@ -94,7 +96,7 @@ export default function WatchRequestForm({ query, onDone }: { query: PlateQuery;
 
       <div className="grid grid-cols-2 gap-2">
         <label className="text-sm font-medium">
-          <span className="mb-1 block">หมวดอักษร</span>
+          <span className="mb-1 block">{t("หมวดอักษร", "Plate letters")}</span>
           <input
             className={`field ${prefix && !prefixOk ? "border-warn" : ""}`}
             value={prefix}
@@ -103,7 +105,7 @@ export default function WatchRequestForm({ query, onDone }: { query: PlateQuery;
           />
         </label>
         <label className="text-sm font-medium">
-          <span className="mb-1 block">เลขทะเบียน</span>
+          <span className="mb-1 block">{t("เลขทะเบียน", "Plate number")}</span>
           <input
             className={`field ${number && !numberOk ? "border-warn" : ""}`}
             value={number}
@@ -114,16 +116,16 @@ export default function WatchRequestForm({ query, onDone }: { query: PlateQuery;
         </label>
       </div>
       <label className="text-sm font-medium">
-        <span className="mb-1 block">จังหวัด</span>
-        <ProvinceInput value={province} onChange={setProvince} />
-        {!provinceOk && <span className="mt-1 block text-xs text-warn">จังหวัดจำเป็นสำหรับการจับคู่</span>}
+        <span className="mb-1 block">{t("จังหวัด", "Province")}</span>
+        <ProvinceInput value={province} onChange={setProvince} placeholder={t("พิมพ์ชื่อจังหวัด เช่น กทม, ชลบุรี", "Enter a province, e.g. Bangkok or Chon Buri")} />
+        {!provinceOk && <span className="mt-1 block text-xs text-warn">{t("จังหวัดจำเป็นสำหรับการจับคู่", "Province is required for matching")}</span>}
       </label>
 
       <label className="text-sm font-medium">
-        <span className="mb-1 block">ชื่อผู้ฝากตามหา</span>
+        <span className="mb-1 block">{t("ชื่อผู้ฝากตามหา", "Owner name")}</span>
         <input
           className="field"
-          placeholder="ชื่อหรือชื่อเล่น"
+          placeholder={t("ชื่อหรือชื่อเล่น", "Name or nickname")}
           value={name}
           maxLength={60}
           onChange={(e) => setName(e.target.value)}
@@ -131,24 +133,24 @@ export default function WatchRequestForm({ query, onDone }: { query: PlateQuery;
       </label>
 
       <label className="text-sm font-medium">
-        <span className="mb-1 block">เบอร์โทรติดต่อ</span>
+        <span className="mb-1 block">{t("เบอร์โทรติดต่อ", "Contact phone")}</span>
         <input
           className="field"
           type="tel"
-          placeholder="เช่น 081-234-5678"
+          placeholder={t("เช่น 081-234-5678", "e.g. 081-234-5678")}
           value={phone}
           inputMode="tel"
           maxLength={40}
           onChange={(e) => setPhone(e.target.value)}
         />
         <span className="mt-1 block text-xs text-ink-3">
-          แสดงต่อผู้แจ้งพบป้ายของคุณเท่านั้น เราไม่โทรหาคุณและไม่ส่งต่อให้ผู้อื่น
+          {t("แสดงต่อผู้แจ้งพบป้ายของคุณเท่านั้น เราไม่โทรหาคุณและไม่ส่งต่อให้ผู้อื่น", "Shown only to the person who reports your plate. We will not call you or share it with anyone else.")}
         </span>
       </label>
 
       <div className="grid grid-cols-2 items-end gap-2">
         <label className="min-w-0 text-sm font-medium">
-          <span className="mb-1 block">กำหนดรหัสจัดการ 6 หลัก</span>
+          <span className="mb-1 block">{t("กำหนดรหัสจัดการ 6 หลัก", "Set a 6-digit management code")}</span>
           <input
             className={`field text-center font-mono tracking-[0.25em] ${managementCode && !codeOk ? "border-warn" : ""}`}
             type="text"
@@ -160,7 +162,7 @@ export default function WatchRequestForm({ query, onDone }: { query: PlateQuery;
           />
         </label>
         <label className="min-w-0 text-sm font-medium">
-          <span className="mb-1 block">ยืนยันรหัสจัดการ</span>
+          <span className="mb-1 block">{t("ยืนยันรหัสจัดการ", "Confirm management code")}</span>
           <input
             className={`field text-center font-mono tracking-[0.25em] ${confirmCode && !codeMatches ? "border-warn" : ""}`}
             type="text"
@@ -172,7 +174,7 @@ export default function WatchRequestForm({ query, onDone }: { query: PlateQuery;
           />
         </label>
         <p className="col-span-2 text-xs text-ink-3">
-          ใช้รหัสนี้สำหรับแก้ไขหรือยกเลิกรายการ กรุณาจดเก็บไว้ และอย่าใช้รหัสที่เดาง่าย
+          {t("ใช้รหัสนี้สำหรับแก้ไขหรือยกเลิกรายการ กรุณาจดเก็บไว้ และอย่าใช้รหัสที่เดาง่าย", "Use this code to edit or cancel the alert. Keep it safe and do not choose an easy-to-guess code.")}
         </p>
       </div>
 
@@ -185,17 +187,17 @@ export default function WatchRequestForm({ query, onDone }: { query: PlateQuery;
           onChange={(e) => setConsent(e.target.checked)}
         />
         <span>
-          ยินยอมให้ <b className="text-ink">{SITE_NAME}</b> นำข้อมูลส่วนบุคคลของข้าพเจ้า (ชื่อ, เบอร์โทรศัพท์, ข้อมูลป้ายทะเบียน) ไปใช้
-          เพื่อวัตถุประสงค์ในการตามหาป้ายทะเบียนที่สูญหายเท่านั้น โดยไม่อนุญาตให้นำไปใช้ในวัตถุประสงค์อื่น
+          {t("ยินยอมให้", "I consent to")} <b className="text-ink">{SITE_NAME}</b>{" "}
+          {t("นำข้อมูลส่วนบุคคลของข้าพเจ้า (ชื่อ, เบอร์โทรศัพท์, ข้อมูลป้ายทะเบียน) ไปใช้ เพื่อวัตถุประสงค์ในการตามหาป้ายทะเบียนที่สูญหายเท่านั้น โดยไม่อนุญาตให้นำไปใช้ในวัตถุประสงค์อื่น", "using my personal information (name, phone number, and plate details) solely to locate the missing plate. It may not be used for any other purpose.")}
           <br />
-          <span className="text-ink-3/80">(ข้อมูลเลขป้ายและชื่อ/เบอร์จะไม่ถูกประกาศบนหน้าเว็บสาธารณะ)</span>
+          <span className="text-ink-3/80">{t("(ข้อมูลเลขป้ายและชื่อ/เบอร์จะไม่ถูกประกาศบนหน้าเว็บสาธารณะ)", "(The plate details and name/phone number will not be published on the public website.)")}</span>
         </span>
       </label>
 
-      {error && <p className="text-sm text-warn">{error}</p>}
+      {error && <p className="text-sm text-warn">{t(error)}</p>}
 
       <button type="submit" className="btn-primary" disabled={!canSubmit}>
-        {busy ? "กำลังบันทึก…" : "ฝากตามหาป้ายนี้"}
+        {busy ? t("กำลังบันทึก…", "Saving…") : t("ฝากตามหาป้ายนี้", "Create a missing-plate alert")}
       </button>
     </form>
   );

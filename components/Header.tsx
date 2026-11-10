@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { FOUND_PATH, REPLACEMENT_GUIDE_PATH, REPORT_PATH } from "@/lib/urls";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const icon = (d: ReactNode) => (
   <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -91,6 +92,7 @@ export default function Header() {
             );
           })}
         </nav>
+        <LanguageSwitcher />
       </div>
     </header>
   );

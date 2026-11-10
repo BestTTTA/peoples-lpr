@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import CropEditor from "@/components/CropEditor";
 import DevCredit from "@/components/DevCredit";
 import LocationPicker, { type LatLng } from "@/components/LocationPicker";
+import { useLanguage } from "@/components/LanguageProvider";
 import PageBanner from "@/components/PageBanner";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
@@ -79,9 +80,14 @@ const MAX_PHOTOS = 10;
 const PLATE_CONF_OK = 0.85;
 const PROVINCE_CONF_OK = 0.6;
 
-const STEPS = ["เลือกรูป & ตีกรอบ", "ตรวจสอบเลขป้าย", "ปักหมุด & ยืนยัน"];
+const STEPS = [
+  { th: "เลือกรูป & ตีกรอบ", en: "Select & crop" },
+  { th: "ตรวจสอบเลขป้าย", en: "Check plate number" },
+  { th: "ปักหมุด & ยืนยัน", en: "Location & confirm" },
+];
 
 export default function ReportFlow() {
+  const { locale, t } = useLanguage();
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -508,16 +514,21 @@ export default function ReportFlow() {
 
   return (
     <>
-      <PageBanner title="แจ้งพบป้ายทะเบียน" subtitle="ช่วยให้เจ้าของป้ายตามหาเจอ — ใช้เวลาไม่ถึง 2 นาที" width="max-w-4xl" compact>
+      <PageBanner
+        title={t("แจ้งพบป้ายทะเบียน", "Report a found license plate")}
+        subtitle={t("ช่วยให้เจ้าของป้ายตามหาเจอ — ใช้เวลาไม่ถึง 2 นาที", "Help its owner find it — takes less than 2 minutes")}
+        width="max-w-4xl"
+        compact
+      >
         <ol className="mt-4 grid grid-cols-3 gap-2">
           {STEPS.map((s, i) => (
             <li
-              key={s}
+              key={s.th}
               className={`rounded-xl px-2 py-2 text-center text-xs font-semibold sm:text-sm ${
                 i === step ? "bg-white text-brand shadow" : i < step ? "bg-white/25 text-white" : "bg-white/10 text-white/80"
               }`}
             >
-              {i + 1}. {s}
+              {i + 1}. {t(s.th, s.en)}
             </li>
           ))}
         </ol>
@@ -526,7 +537,7 @@ export default function ReportFlow() {
     <div className="mx-auto -mt-6 flex w-full max-w-4xl flex-col gap-4 px-4 pb-28">
       <UploadGuide />
 
-      {error && <div className="rounded-xl border border-warn/50 bg-warn/10 px-4 py-2.5 text-sm">{error}</div>}
+      {error && <div className="rounded-xl border border-warn/50 bg-warn/10 px-4 py-2.5 text-sm">{t(error)}</div>}
 
       {step === 0 && (
         <section className="card flex flex-col gap-3 p-4">
@@ -553,11 +564,11 @@ export default function ReportFlow() {
             }}
           />
 
-          <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1" role="radiogroup" aria-label="วิธีครอบป้าย">
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1" role="radiogroup" aria-label={t("วิธีครอบป้าย", "Plate cropping method")}>
             {(
               [
-                ["auto", "🤖 AI ครอปให้", "หาป้ายในรูปอัตโนมัติ"],
-                ["manual", "✍️ ตีกรอบเอง", "ลากครอบทีละป้าย"],
+                ["auto", t("🤖 AI ครอปให้", "🤖 AI crop"), t("หาป้ายในรูปอัตโนมัติ", "Automatically find plates in the photo")],
+                ["manual", t("✍️ ตีกรอบเอง", "✍️ Crop manually"), t("ลากครอบทีละป้าย", "Draw a box around each plate")],
               ] as const
             ).map(([m, label, sub]) => (
               <button
@@ -584,14 +595,18 @@ export default function ReportFlow() {
               }}
             >
               <div className="text-4xl">📷</div>
-              <p className="font-semibold">ถ่ายรูปหรือเลือกรูปป้ายทะเบียนที่พบ</p>
-              <p className="text-sm text-ink-3">รูปเดียวหลายป้ายได้ · เลือกได้สูงสุด {MAX_PHOTOS} รูป · ลากไฟล์มาวางได้</p>
+              <p className="font-semibold">{t("ถ่ายรูปหรือเลือกรูปป้ายทะเบียนที่พบ", "Take or select photos of the plates you found")}</p>
+              <p className="text-sm text-ink-3">
+                {locale === "en"
+                  ? `Multiple plates per photo · Up to ${MAX_PHOTOS} photos · Drag and drop supported`
+                  : `รูปเดียวหลายป้ายได้ · เลือกได้สูงสุด ${MAX_PHOTOS} รูป · ลากไฟล์มาวางได้`}
+              </p>
               <div className="flex flex-wrap justify-center gap-2">
                 <button type="button" className="btn-primary" onClick={() => cameraInput.current?.click()}>
-                  ถ่ายรูป
+                  {t("ถ่ายรูป", "Take photo")}
                 </button>
                 <button type="button" className="btn-ghost" onClick={() => fileInput.current?.click()}>
-                  เลือกจากเครื่อง
+                  {t("เลือกจากเครื่อง", "Choose from device")}
                 </button>
               </div>
             </div>
@@ -606,14 +621,14 @@ export default function ReportFlow() {
                       className={`block overflow-hidden rounded-lg border-2 ${i === active ? "border-brand" : "border-transparent"}`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element -- local blob URL */}
-                      <img src={p.url} alt={`รูปที่ ${i + 1}`} className="h-16 w-20 object-cover" />
+                      <img src={p.url} alt={locale === "en" ? `Photo ${i + 1}` : `รูปที่ ${i + 1}`} className="h-16 w-20 object-cover" />
                     </button>
                     <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-[10px] text-white">
-                      {p.scan === "busy" ? "AI…" : `${p.boxes.length} ป้าย`}
+                      {p.scan === "busy" ? "AI…" : locale === "en" ? `${p.boxes.length} plate(s)` : `${p.boxes.length} ป้าย`}
                     </span>
                     <button
                       type="button"
-                      aria-label={`ลบรูปที่ ${i + 1}`}
+                      aria-label={locale === "en" ? `Remove photo ${i + 1}` : `ลบรูปที่ ${i + 1}`}
                       onClick={() => removePhoto(i)}
                       className="absolute -top-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-red-500 text-xs text-white"
                     >
@@ -626,7 +641,7 @@ export default function ReportFlow() {
                     type="button"
                     onClick={() => fileInput.current?.click()}
                     className="grid h-16 w-20 shrink-0 place-items-center rounded-lg border-2 border-dashed border-line text-2xl text-ink-3"
-                    aria-label="เพิ่มรูป"
+                    aria-label={t("เพิ่มรูป", "Add photo")}
                   >
                     +
                   </button>
@@ -636,18 +651,18 @@ export default function ReportFlow() {
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="rounded-lg bg-violet/10 px-2 py-1 font-medium text-violet">
                   {mode === "manual"
-                    ? "✍️ ลากครอบป้ายทีละป้ายบนรูป"
+                    ? t("✍️ ลากครอบป้ายทีละป้ายบนรูป", "✍️ Draw a box around each plate in the photo")
                     : current?.scan === "busy"
-                      ? "🤖 AI กำลังหาป้ายในรูปนี้…"
+                      ? t("🤖 AI กำลังหาป้ายในรูปนี้…", "🤖 AI is finding plates in this photo…")
                       : current?.scan === "turned"
-                        ? "🤖 หมุนรูปให้ตรงและตีกรอบป้ายให้แล้ว — ตรวจกรอบได้"
+                        ? t("🤖 หมุนรูปให้ตรงและตีกรอบป้ายให้แล้ว — ตรวจกรอบได้", "🤖 The photo was straightened and plates were boxed — please review")
                       : current?.scan === "whole"
-                        ? "🤖 รูปนี้เป็นป้ายเดียวเต็มรูป — ใช้ทั้งรูปเป็น 1 ป้าย (แก้กรอบได้)"
+                        ? t("🤖 รูปนี้เป็นป้ายเดียวเต็มรูป — ใช้ทั้งรูปเป็น 1 ป้าย (แก้กรอบได้)", "🤖 One plate fills this photo — using the full photo (box can be edited)")
                         : current?.scan === "none"
-                        ? "🤖 AI หาป้ายไม่เจอ — ลากครอบเองได้"
+                        ? t("🤖 AI หาป้ายไม่เจอ — ลากครอบเองได้", "🤖 AI found no plate — draw a box manually")
                         : current?.scan === "fail"
-                          ? "🤖 AI ใช้งานไม่ได้ตอนนี้ — ลากครอบเองได้"
-                          : "🤖 ตรวจกรอบที่ AI ตีให้ · กด × ลบกรอบผิด · ลากเพิ่มป้ายที่ขาด"}
+                          ? t("🤖 AI ใช้งานไม่ได้ตอนนี้ — ลากครอบเองได้", "🤖 AI is unavailable — draw a box manually")
+                          : t("🤖 ตรวจกรอบที่ AI ตีให้ · กด × ลบกรอบผิด · ลากเพิ่มป้ายที่ขาด", "🤖 Review AI boxes · use × to remove incorrect boxes · draw any missing ones")}
                 </span>
                 {mode === "auto" && current && current.scan !== "busy" && (
                   <button
@@ -658,28 +673,28 @@ export default function ReportFlow() {
                       scan({ ...current, boxes: [] });
                     }}
                   >
-                    ให้ AI หาใหม่
+                    {t("ให้ AI หาใหม่", "Run AI again")}
                   </button>
                 )}
                 <button
                   type="button"
                   className="btn-ghost px-3 py-1.5 text-sm"
-                  title="หมุนรูปตามเข็มนาฬิกา 90°"
+                  title={t("หมุนรูปตามเข็มนาฬิกา 90°", "Rotate photo 90° clockwise")}
                   disabled={!!busy || current.scan === "busy"}
                   onClick={() => rotate(active)}
                 >
-                  ↻ หมุนรูป
+                  ↻ {t("หมุนรูป", "Rotate")}
                 </button>
                 <button
                   type="button"
                   className="btn-ghost px-3 py-1.5 text-sm"
                   onClick={() => setBoxes(active, [...current.boxes, { x: 0, y: 0, w: 1, h: 1, source: "whole" }])}
                 >
-                  ทั้งรูปคือ 1 ป้าย
+                  {t("ทั้งรูปคือ 1 ป้าย", "Use full photo as one plate")}
                 </button>
                 {current.boxes.length > 0 && (
                   <button type="button" className="btn-ghost px-3 py-1.5 text-sm" onClick={() => editBoxes(active, [])}>
-                    ล้างกรอบในรูปนี้
+                    {t("ล้างกรอบในรูปนี้", "Clear boxes in this photo")}
                   </button>
                 )}
               </div>
@@ -703,10 +718,11 @@ export default function ReportFlow() {
       {step === 1 && (
         <section className="flex flex-col gap-3">
           <p className="text-sm text-ink-3">
-            ตรวจสอบว่าตรงกับป้ายจริง แก้ไขได้ทุกช่อง · ช่อง<span className="mx-1 rounded bg-warn/20 px-1">สีเหลือง</span>
-            คือระบบไม่แน่ใจ
+            {t("ตรวจสอบว่าตรงกับป้ายจริง แก้ไขได้ทุกช่อง · ช่อง", "Check each result against the actual plate. Every field can be edited · ")}
+            <span className="mx-1 rounded bg-warn/20 px-1">{t("สีเหลือง", "yellow")}</span>
+            {t("คือระบบไม่แน่ใจ", "means the system is uncertain.")}
           </p>
-          {drafts.length === 0 && <div className="card p-4 text-sm">ไม่มีป้ายเหลืออยู่ — กลับไปตีกรอบใหม่</div>}
+          {drafts.length === 0 && <div className="card p-4 text-sm">{t("ไม่มีป้ายเหลืออยู่ — กลับไปตีกรอบใหม่", "No plates remain — go back and draw new boxes.")}</div>}
           {(flaggedCount > 0 || focusKeys) && (
             <div
               className={`flex flex-wrap items-center gap-2 rounded-xl border p-3 text-sm ${
@@ -716,9 +732,9 @@ export default function ReportFlow() {
               <span className="font-semibold">
                 {flaggedCount > 0
                   ? focusKeys
-                    ? `⚠️ เหลือ ${flaggedCount} ป้ายที่ต้องตรวจ`
-                    : `⚠️ มี ${flaggedCount} ป้ายที่ระบบไม่แน่ใจ (สีเหลือง)`
-                  : "✓ ตรวจครบแล้ว — กด “ถัดไป” ได้เลย"}
+                    ? locale === "en" ? `⚠️ ${flaggedCount} plate(s) still need review` : `⚠️ เหลือ ${flaggedCount} ป้ายที่ต้องตรวจ`
+                    : locale === "en" ? `⚠️ ${flaggedCount} uncertain plate(s) (yellow)` : `⚠️ มี ${flaggedCount} ป้ายที่ระบบไม่แน่ใจ (สีเหลือง)`
+                  : t("✓ ตรวจครบแล้ว — กด “ถัดไป” ได้เลย", "✓ Review complete — select Next to continue")}
               </span>
               <div className="ml-auto flex flex-wrap gap-2">
                 <button
@@ -726,17 +742,17 @@ export default function ReportFlow() {
                   className="btn-ghost px-3 py-1.5 text-sm"
                   onClick={() => setFocusKeys(focusKeys ? null : drafts.filter(flagged).map((d) => d.key))}
                 >
-                  {focusKeys ? "แสดงทุกป้าย" : "ตรวจแก้ทีละป้าย"}
+                  {focusKeys ? t("แสดงทุกป้าย", "Show all plates") : t("ตรวจแก้ทีละป้าย", "Review uncertain plates")}
                 </button>
                 {flaggedCount > 0 && (
                   <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={skipFlagged}>
-                    ข้ามทั้งหมดแล้วไปต่อ
+                    {t("ข้ามทั้งหมดแล้วไปต่อ", "Skip all and continue")}
                   </button>
                 )}
               </div>
               {flaggedCount > 0 && (
                 <p className="w-full text-xs text-ink-3">
-                  “ข้าม” = ใช้ค่าที่ระบบอ่านได้ตามเดิม (จังหวัดที่อ่านไม่ได้ส่งเป็น “ไม่ระบุจังหวัด”) ส่วนป้ายที่ไม่มีหมวดหรือเลขจะไม่ถูกส่ง
+                  {t("“ข้าม” = ใช้ค่าที่ระบบอ่านได้ตามเดิม (จังหวัดที่อ่านไม่ได้ส่งเป็น “ไม่ระบุจังหวัด”) ส่วนป้ายที่ไม่มีหมวดหรือเลขจะไม่ถูกส่ง", "Skip keeps the detected values. An unreadable province is submitted as unspecified, while a plate without letters or a number is not submitted.")}
                 </p>
               )}
             </div>
@@ -752,16 +768,16 @@ export default function ReportFlow() {
               return (
                 <article key={d.key} className="card flex items-center gap-3 p-3 opacity-60">
                   {/* eslint-disable-next-line @next/next/no-img-element -- local blob URL */}
-                  <img src={d.cropUrl} alt={`ป้ายที่ ${i + 1}`} className="h-12 w-20 rounded object-contain" />
+                  <img src={d.cropUrl} alt={locale === "en" ? `Plate ${i + 1}` : `ป้ายที่ ${i + 1}`} className="h-12 w-20 rounded object-contain" />
                   <span className="flex-1 text-sm">
-                    ป้ายที่ {i + 1} · ข้ามแล้ว — ป้ายนี้จะไม่ถูกส่ง
+                    {locale === "en" ? `Plate ${i + 1} · skipped — this plate will not be submitted` : `ป้ายที่ ${i + 1} · ข้ามแล้ว — ป้ายนี้จะไม่ถูกส่ง`}
                   </span>
                   <button
                     type="button"
                     className="btn-ghost px-3 py-1.5 text-sm"
                     onClick={() => editDraft(d.key, { skipped: false, reviewed: false })}
                   >
-                    นำกลับมา
+                    {t("นำกลับมา", "Restore")}
                   </button>
                 </article>
               );
@@ -775,7 +791,7 @@ export default function ReportFlow() {
                 <div className="flex flex-col gap-2">
                   <div className="relative overflow-hidden rounded-lg bg-surface-2">
                     {/* eslint-disable-next-line @next/next/no-img-element -- local blob URL */}
-                    <img src={d.cropUrl} alt={`ป้ายที่ ${i + 1}`} className="max-h-32 w-full object-contain" />
+                    <img src={d.cropUrl} alt={locale === "en" ? `Plate ${i + 1}` : `ป้ายที่ ${i + 1}`} className="max-h-32 w-full object-contain" />
                     <span className="absolute top-1 left-1 rounded-md bg-brand px-1.5 text-xs font-bold text-white">
                       {i + 1}
                     </span>
@@ -787,54 +803,56 @@ export default function ReportFlow() {
                 <div className="flex flex-col gap-2">
                   <div className="grid grid-cols-2 gap-2">
                     <label className="text-sm font-medium">
-                      หมวดอักษร
+                      {t("หมวดอักษร", "Plate letters")}
                       <input
                         className={`field mt-1 ${prefixErr ? "border-red-500 bg-red-500/10" : lowPlate ? "border-warn bg-warn/10" : ""}`}
                         value={d.prefix}
                         maxLength={5}
-                        placeholder="เช่น 3ฒน"
+                        placeholder={t("เช่น 3ฒน", "e.g. 3ฒน")}
                         onChange={(e) => editDraft(d.key, { prefix: e.target.value })}
                       />
-                      {prefixErr && <span className="mt-1 block text-xs font-normal text-red-400">{prefixErr}</span>}
+                      {prefixErr && <span className="mt-1 block text-xs font-normal text-red-400">{t(prefixErr)}</span>}
                     </label>
                     <label className="text-sm font-medium">
-                      เลขทะเบียน
+                      {t("เลขทะเบียน", "Plate number")}
                       <input
                         className={`field mt-1 ${numberErr ? "border-red-500 bg-red-500/10" : lowPlate ? "border-warn bg-warn/10" : ""}`}
                         value={d.number}
                         inputMode="numeric"
                         maxLength={4}
-                        placeholder="เช่น 5702"
+                        placeholder={t("เช่น 5702", "e.g. 5702")}
                         onChange={(e) => editDraft(d.key, { number: e.target.value.replace(/\D/g, "") })}
                       />
-                      {numberErr && <span className="mt-1 block text-xs font-normal text-red-400">{numberErr}</span>}
+                      {numberErr && <span className="mt-1 block text-xs font-normal text-red-400">{t(numberErr)}</span>}
                     </label>
                   </div>
                   <label className="text-sm font-medium">
-                    จังหวัด
+                    {t("จังหวัด", "Province")}
                     <ProvinceInput
                       className={`mt-1 ${lowProvince || (!d.province && !d.reviewed) ? "[&_.field]:border-warn [&_.field]:bg-warn/10" : ""}`}
                       value={d.province}
                       onChange={(v) => editDraft(d.key, { province: v })}
-                      emptyLabel="ไม่ระบุจังหวัด"
+                      emptyLabel={t("ไม่ระบุจังหวัด", "Province not specified")}
                     />
                     {!d.province && !d.reviewed && (
                       <span className="mt-1 block text-xs font-normal text-ink-3">
-                        อ่านจังหวัดไม่ได้ — เลือกจากรายการ หรือกด “ถูกต้องแล้ว” เพื่อส่งแบบไม่ระบุจังหวัด
+                        {t("อ่านจังหวัดไม่ได้ — เลือกจากรายการ หรือกด “ถูกต้องแล้ว” เพื่อส่งแบบไม่ระบุจังหวัด", "The province could not be read. Select one, or choose Looks correct to submit without a province.")}
                       </span>
                     )}
                   </label>
                   <div className="flex items-center gap-2 text-xs text-ink-3">
                     <span>
-                      ความมั่นใจ: เลข {Math.round(d.plateConf * 100)}% · จังหวัด {Math.round(d.provinceConf * 100)}%
-                      {d.suspect && !d.reviewed && " · ระบบอ่านได้ไม่ครบรูปแบบ เทียบกับรูปอีกครั้ง"}
+                      {locale === "en"
+                        ? `Confidence: number ${Math.round(d.plateConf * 100)}% · province ${Math.round(d.provinceConf * 100)}%`
+                        : `ความมั่นใจ: เลข ${Math.round(d.plateConf * 100)}% · จังหวัด ${Math.round(d.provinceConf * 100)}%`}
+                      {d.suspect && !d.reviewed && t(" · ระบบอ่านได้ไม่ครบรูปแบบ เทียบกับรูปอีกครั้ง", " · The detected format is incomplete; compare it with the photo again")}
                     </span>
                     <button
                       type="button"
                       className="ml-auto text-red-400 hover:underline"
                       onClick={() => removeDraft(d.key)}
                     >
-                      ลบป้ายนี้
+                      {t("ลบป้ายนี้", "Remove this plate")}
                     </button>
                   </div>
                   {flagged(d) && (
@@ -845,29 +863,29 @@ export default function ReportFlow() {
                         disabled={!draftValid(d)}
                         onClick={() => editDraft(d.key, { reviewed: true })}
                       >
-                        ✓ ถูกต้องแล้ว
+                        {t("✓ ถูกต้องแล้ว", "✓ Looks correct")}
                       </button>
                       <button
                         type="button"
                         className="btn-ghost px-3 py-1.5 text-sm"
                         onClick={() => editDraft(d.key, { skipped: true })}
                       >
-                        ข้ามป้ายนี้
+                        {t("ข้ามป้ายนี้", "Skip this plate")}
                       </button>
                       {!draftValid(d) && (
-                        <span className="self-center text-xs text-ink-3">แก้ช่องสีแดงก่อนจึงกด “ถูกต้องแล้ว” ได้</span>
+                        <span className="self-center text-xs text-ink-3">{t("แก้ช่องสีแดงก่อนจึงกด “ถูกต้องแล้ว” ได้", "Fix the red fields before selecting Looks correct.")}</span>
                       )}
                     </div>
                   )}
                   {done && (
                     <div className="flex items-center gap-2 text-sm text-emerald-400">
-                      ✓ ตรวจแล้ว
+                      {t("✓ ตรวจแล้ว", "✓ Reviewed")}
                       <button
                         type="button"
                         className="text-xs text-ink-3 hover:text-ink"
                         onClick={() => editDraft(d.key, { reviewed: false })}
                       >
-                        แก้อีกครั้ง
+                        {t("แก้อีกครั้ง", "Edit again")}
                       </button>
                     </div>
                   )}
@@ -881,11 +899,11 @@ export default function ReportFlow() {
       {step === 2 && (
         <section className="card flex flex-col gap-4 p-4">
           <div>
-            <h2 className="font-semibold">ตำแหน่งที่พบป้าย / จุดรับคืน</h2>
+            <h2 className="font-semibold">{t("ตำแหน่งที่พบป้าย / จุดรับคืน", "Found location / collection point")}</h2>
             <p className="text-sm text-ink-3">
               {noPin
-                ? "รายงานนี้จะไม่มีหมุดบนแผนที่ ผู้ที่ค้นเจอป้ายจะเห็นเฉพาะข้อความจุดรับคืนด้านล่าง"
-                : "ผู้ค้นหาจะเห็นหมุดนี้บนแผนที่"}
+                ? t("รายงานนี้จะไม่มีหมุดบนแผนที่ ผู้ที่ค้นเจอป้ายจะเห็นเฉพาะข้อความจุดรับคืนด้านล่าง", "This report will have no map marker. People who find the plate will only see the collection note below.")
+                : t("ผู้ค้นหาจะเห็นหมุดนี้บนแผนที่", "People searching for the plate will see this marker on the map.")}
             </p>
           </div>
           <label className="flex items-start gap-2 rounded-xl border border-line bg-surface-2/60 px-3 py-2.5 text-sm">
@@ -896,48 +914,48 @@ export default function ReportFlow() {
               onChange={(e) => setNoPin(e.target.checked)}
             />
             <span>
-              <b>ไม่ปักหมุด</b>
-              <span className="text-ink-3"> — ระบุจุดรับคืนเป็นข้อความอย่างเดียว (เช่น “ฝากไว้ที่ร้านค้าหน้าซอย…”)</span>
+              <b>{t("ไม่ปักหมุด", "No map marker")}</b>
+              <span className="text-ink-3">{t(" — ระบุจุดรับคืนเป็นข้อความอย่างเดียว (เช่น “ฝากไว้ที่ร้านค้าหน้าซอย…”)", " — describe the collection point in text only (e.g. “Left at the shop by the alley…”)")}</span>
             </span>
           </label>
           {!noPin && <LocationPicker value={location} onChange={setLocation} />}
           <label className="text-sm font-medium">
-            จุดรับคืน / หมายเหตุ{" "}
+            {t("จุดรับคืน / หมายเหตุ", "Collection point / note")}{" "}
             <span className={noPin ? "font-semibold text-warn" : "font-normal text-ink-3"}>
-              {noPin ? "(จำเป็น เมื่อไม่ปักหมุด)" : "(แนะนำ)"}
+              {noPin ? t("(จำเป็น เมื่อไม่ปักหมุด)", "(Required without a map marker)") : t("(แนะนำ)", "(Recommended)")}
             </span>
             <textarea
               className="field mt-1 min-h-20"
               maxLength={500}
-              placeholder="เช่น ฝากไว้ที่ป้อมยามหน้าหมู่บ้าน, เก็บได้หลังน้ำลด"
+              placeholder={t("เช่น ฝากไว้ที่ป้อมยามหน้าหมู่บ้าน, เก็บได้หลังน้ำลด", "e.g. Left at the village security post or collected after the flood")}
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
           </label>
           <label className="text-sm font-medium">
-            ช่องทางติดต่อ <span className="font-normal text-ink-3">(ไม่บังคับ — แสดงเฉพาะผู้ที่ค้นเจอป้ายตรงกัน)</span>
+            {t("ช่องทางติดต่อ", "Contact details")} <span className="font-normal text-ink-3">{t("(ไม่บังคับ — แสดงเฉพาะผู้ที่ค้นเจอป้ายตรงกัน)", "(Optional — shown only to someone searching for the matching plate)")}</span>
             <input
               className="field mt-1"
               maxLength={200}
-              placeholder="เช่น Line ID หรือเบอร์โทร"
+              placeholder={t("เช่น Line ID หรือเบอร์โทร", "e.g. LINE ID or phone number")}
               value={contact}
               onChange={(e) => setContact(e.target.value)}
             />
           </label>
           <label className="text-sm font-medium">
-            ลิงก์โพสต์ต้นทาง{" "}
+            {t("ลิงก์โพสต์ต้นทาง", "Original post link")}{" "}
             <span className="font-normal text-ink-3">
-              (ไม่บังคับ — เช่น ลิงก์ Facebook ที่โพสต์ประกาศเจอป้ายนี้ · แสดงเฉพาะผู้ที่ค้นเจอป้ายตรงกัน)
+              {t("(ไม่บังคับ — เช่น ลิงก์ Facebook ที่โพสต์ประกาศเจอป้ายนี้ · แสดงเฉพาะผู้ที่ค้นเจอป้ายตรงกัน)", "(Optional — e.g. the Facebook post reporting this plate · shown only for a matching search)")}
             </span>
             <input
               className={`field mt-1 ${sourceUrlBad ? "border-red-500" : ""}`}
               inputMode="url"
               maxLength={500}
-              placeholder="เช่น https://www.facebook.com/…"
+              placeholder={t("เช่น https://www.facebook.com/…", "e.g. https://www.facebook.com/…")}
               value={sourceUrl}
               onChange={(e) => setSourceUrl(e.target.value)}
             />
-            {sourceUrlBad && <span className="mt-1 block text-xs font-normal text-red-400">ต้องเป็นลิงก์เว็บ เช่น https://facebook.com/…</span>}
+            {sourceUrlBad && <span className="mt-1 block text-xs font-normal text-red-400">{t("ต้องเป็นลิงก์เว็บ เช่น https://facebook.com/…", "Enter a web link, e.g. https://facebook.com/…")}</span>}
           </label>
           <div className="flex flex-wrap gap-1.5">
             {drafts.map((d) => (
@@ -959,14 +977,13 @@ export default function ReportFlow() {
               onChange={(e) => setConsent(e.target.checked)}
             />
             <span className="text-ink-3">
-              <b className="text-ink">ความยินยอมในการเก็บและเผยแพร่ข้อมูล</b>
+              <b className="text-ink">{t("ความยินยอมในการเก็บและเผยแพร่ข้อมูล", "Consent to store and publish information")}</b>
               <br />
-              ยินยอมให้ <b className="text-ink">ป้ายทะเบียนหาย.com</b> จัดเก็บและประกาศข้อมูลที่กรอก
-              (รูปป้าย, จุดที่พบ, ข้อความและช่องทางติดต่อถ้ามี) บนเว็บไซต์ เพื่อวัตถุประสงค์เดียวคือช่วยเจ้าของป้ายทะเบียนที่สูญหาย
-              ให้ติดต่อขอรับคืน โดยไม่อนุญาตให้นำไปใช้ในวัตถุประสงค์อื่น
+              {t("ยินยอมให้", "I consent to")} <b className="text-ink">ป้ายทะเบียนหาย.com</b>{" "}
+              {t("จัดเก็บและประกาศข้อมูลที่กรอก (รูปป้าย, จุดที่พบ, ข้อความและช่องทางติดต่อถ้ามี) บนเว็บไซต์ เพื่อวัตถุประสงค์เดียวคือช่วยเจ้าของป้ายทะเบียนที่สูญหาย ให้ติดต่อขอรับคืน โดยไม่อนุญาตให้นำไปใช้ในวัตถุประสงค์อื่น", "storing and publishing the submitted information (plate photos, found location, notes, and contact details when provided) solely to help the owner of a missing plate arrange its return. It may not be used for any other purpose.")}
               <br />
               <span className="text-ink-3/80">
-                จำเป็นต้องยินยอม จึงจะยืนยันขึ้นข้อมูลป้ายทะเบียนที่พบได้
+                {t("จำเป็นต้องยินยอม จึงจะยืนยันขึ้นข้อมูลป้ายทะเบียนที่พบได้", "Consent is required before the found-plate report can be published.")}
               </span>
             </span>
           </label>
@@ -980,35 +997,39 @@ export default function ReportFlow() {
         <div className="mx-auto flex max-w-4xl items-center gap-2 px-4 py-3">
           {step > 0 && (
             <button type="button" className="btn-ghost" disabled={!!busy} onClick={() => setStep(step - 1)}>
-              ย้อนกลับ
+              {t("ย้อนกลับ", "Back")}
             </button>
           )}
           <span className="min-w-0 truncate text-sm text-ink-3">
-            {busy ||
+            {busy ? t(busy) :
               (step === 0
-                ? `${photos.length} รูป · ${boxCount} ป้าย`
+                ? locale === "en" ? `${photos.length} photo(s) · ${boxCount} plate(s)` : `${photos.length} รูป · ${boxCount} ป้าย`
                 : step === 1
                   ? kept.every(draftValid)
-                    ? `${kept.length} ป้ายพร้อม${drafts.length > kept.length ? ` · ข้าม ${drafts.length - kept.length}` : ""}`
-                    : `อีก ${kept.filter((d) => !draftValid(d)).length} ป้ายยังไม่ครบ — แก้ช่องสีแดง หรือกดข้าม`
+                    ? locale === "en"
+                      ? `${kept.length} plate(s) ready${drafts.length > kept.length ? ` · ${drafts.length - kept.length} skipped` : ""}`
+                      : `${kept.length} ป้ายพร้อม${drafts.length > kept.length ? ` · ข้าม ${drafts.length - kept.length}` : ""}`
+                    : locale === "en"
+                      ? `${kept.filter((d) => !draftValid(d)).length} incomplete plate(s) — fix red fields or skip`
+                      : `อีก ${kept.filter((d) => !draftValid(d)).length} ป้ายยังไม่ครบ — แก้ช่องสีแดง หรือกดข้าม`
                   : !consent
-                    ? "ติ๊กยินยอมก่อนจึงจะยืนยันได้"
+                    ? t("ติ๊กยินยอมก่อนจึงจะยืนยันได้", "Consent is required before confirmation")
                     : noPin
                       ? noteOk
-                        ? "พร้อมยืนยัน (ไม่ปักหมุด)"
-                        : "ระบุจุดรับคืนก่อน"
+                        ? t("พร้อมยืนยัน (ไม่ปักหมุด)", "Ready to confirm (no map marker)")
+                        : t("ระบุจุดรับคืนก่อน", "Add a collection point first")
                       : location
-                        ? "พร้อมยืนยัน"
-                        : "ยังไม่ได้ปักหมุด")}
+                        ? t("พร้อมยืนยัน", "Ready to confirm")
+                        : t("ยังไม่ได้ปักหมุด", "No map marker selected"))}
           </span>
           {step === 0 && (
             <button type="button" className="btn-primary ml-auto" disabled={!!busy || boxCount === 0} onClick={readPlates}>
-              อ่านป้าย ({boxCount})
+              {t("อ่านป้าย", "Read plates")} ({boxCount})
             </button>
           )}
           {step === 1 && (
             <button type="button" className="btn-primary ml-auto" disabled={!allValid} onClick={() => setStep(2)}>
-              ถัดไป
+              {t("ถัดไป", "Next")}
             </button>
           )}
           {step === 2 && (
@@ -1018,7 +1039,7 @@ export default function ReportFlow() {
               disabled={!!busy || !consent || (noPin ? !noteOk : !location)}
               onClick={confirm}
             >
-              {noPin ? "ยืนยันและบันทึก" : "ยืนยันและขึ้นแผนที่"}
+              {noPin ? t("ยืนยันและบันทึก", "Confirm and save") : t("ยืนยันและขึ้นแผนที่", "Confirm and add to map")}
             </button>
           )}
         </div>
@@ -1034,16 +1055,16 @@ export default function ReportFlow() {
         >
           <div className="card flex w-full max-w-md flex-col gap-3 p-5">
             <h3 id="contact-prompt-title" className="text-lg font-bold">
-              ฝากเบอร์โทรไว้ให้เจ้าของป้ายติดต่อสอบถามเพิ่มเติม
+              {t("ฝากเบอร์โทรไว้ให้เจ้าของป้ายติดต่อสอบถามเพิ่มเติม", "Leave a phone number so the owner can contact you")}
             </h3>
             <p className="text-sm text-ink-3">
-              เจ้าของป้ายจะได้โทรหาผู้แจ้งเพื่อนัดรับคืนได้โดยตรง — ช่วยให้ป้ายกลับถึงเจ้าของเร็วขึ้น
+              {t("เจ้าของป้ายจะได้โทรหาผู้แจ้งเพื่อนัดรับคืนได้โดยตรง — ช่วยให้ป้ายกลับถึงเจ้าของเร็วขึ้น", "The owner can call you directly to arrange collection, helping the plate get home sooner.")}
             </p>
             <input
               className="field"
               type="text"
               maxLength={200}
-              placeholder="เช่น Line ID หรือเบอร์โทร"
+              placeholder={t("เช่น Line ID หรือเบอร์โทร", "e.g. LINE ID or phone number")}
               value={contact}
               autoFocus
               onChange={(e) => setContact(e.target.value)}
@@ -1053,7 +1074,7 @@ export default function ReportFlow() {
             />
             <div className="mt-1 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button type="button" className="btn-ghost" onClick={submit}>
-                ข้ามและยืนยัน
+                {t("ข้ามและยืนยัน", "Skip and confirm")}
               </button>
               <button
                 type="button"
@@ -1061,7 +1082,7 @@ export default function ReportFlow() {
                 disabled={!contact.trim()}
                 onClick={submit}
               >
-                เพิ่มเบอร์
+                {t("เพิ่มเบอร์", "Add contact")}
               </button>
             </div>
           </div>
@@ -1102,11 +1123,13 @@ function ReportSuccess({
   noPin: boolean;
   onContinue: () => void;
 }) {
+  const { locale, t } = useLanguage();
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 p-4 pb-24">
       <p className="text-sm text-emerald-400">
-        ✓ บันทึกแล้ว · {reportedPlates.length} ป้าย{noPin ? "ขึ้นรายการ (ไม่มีหมุดบนแผนที่)" : "ขึ้นแผนที่"} · มีเจ้าของตามหา{" "}
-        <b>{matches.length}</b> คน
+        {locale === "en"
+          ? `✓ Saved · ${reportedPlates.length} plate(s) ${noPin ? "listed without a map marker" : "added to the map"} · ${matches.length} owner(s) are looking for them`
+          : `✓ บันทึกแล้ว · ${reportedPlates.length} ป้าย${noPin ? "ขึ้นรายการ (ไม่มีหมุดบนแผนที่)" : "ขึ้นแผนที่"} · มีเจ้าของตามหา ${matches.length} คน`}
       </p>
 
       {matches.map((m) => (
@@ -1116,12 +1139,12 @@ function ReportSuccess({
         >
           <div className="flex flex-col items-center justify-center gap-2 sm:border-r sm:border-emerald-500/20 sm:pr-5">
             <PlateBadge prefix={m.prefix} number={m.number} province={m.province} size="lg" />
-            <span className="text-xs text-ink-3">ฝากไว้ {relativeTime(m.since)}</span>
+            <span className="text-xs text-ink-3">{t("ฝากไว้", "Created")} {relativeTime(m.since, locale)}</span>
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col justify-center gap-3">
             <div>
-              <div className="text-xs text-ink-3">เจ้าของป้าย</div>
+              <div className="text-xs text-ink-3">{t("เจ้าของป้าย", "Plate owner")}</div>
               <div className="text-lg font-bold">{m.name}</div>
             </div>
             <a
@@ -1131,28 +1154,28 @@ function ReportSuccess({
               <span aria-hidden>📞</span>
               <span className="font-mono tracking-wide">{m.phone}</span>
             </a>
-            <p className="text-xs text-ink-3">กดเพื่อโทร · ติดต่อเจ้าของเพื่อนัดส่งคืนได้เลย</p>
+            <p className="text-xs text-ink-3">{t("กดเพื่อโทร · ติดต่อเจ้าของเพื่อนัดส่งคืนได้เลย", "Select to call the owner and arrange the return.")}</p>
           </div>
         </section>
       ))}
 
       <div className="rounded-xl border border-warn/40 bg-warn/10 p-3 text-sm">
-        <b className="block">⚠️ ก่อนส่งมอบป้ายทะเบียนคืน (ถ้าสะดวก)</b>
-        โปรดขอดูหลักฐานการเป็นเจ้าของ เช่น รูปถ่าย บัตรประชาชน หรือสำเนาทะเบียนรถ
+        <b className="block">{t("⚠️ ก่อนส่งมอบป้ายทะเบียนคืน (ถ้าสะดวก)", "⚠️ Before returning the plate, when practical")}</b>
+        {t("โปรดขอดูหลักฐานการเป็นเจ้าของ เช่น รูปถ่าย บัตรประชาชน หรือสำเนาทะเบียนรถ", "Ask for proof of ownership, such as a photo, ID card, or vehicle registration copy.")}
       </div>
 
       <button type="button" className="btn-ghost self-center" onClick={onContinue}>
-        {noPin ? "ดูรายงานของคุณ →" : "ไปที่จุดรับคืนบนแผนที่ →"}
+        {noPin ? t("ดูรายงานของคุณ →", "View your report →") : t("ไปที่จุดรับคืนบนแผนที่ →", "View the collection point on the map →")}
       </button>
     </div>
   );
 }
 
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, locale: "th" | "en"): string {
   const ms = Date.now() - new Date(iso).getTime();
   const min = Math.max(1, Math.round(ms / 60_000));
-  if (min < 60) return `${min} นาทีที่แล้ว`;
+  if (min < 60) return locale === "en" ? `${min} minute(s) ago` : `${min} นาทีที่แล้ว`;
   const h = Math.round(min / 60);
-  if (h < 24) return `${h} ชั่วโมงที่แล้ว`;
-  return `${Math.round(h / 24)} วันที่แล้ว`;
+  if (h < 24) return locale === "en" ? `${h} hour(s) ago` : `${h} ชั่วโมงที่แล้ว`;
+  return locale === "en" ? `${Math.round(h / 24)} day(s) ago` : `${Math.round(h / 24)} วันที่แล้ว`;
 }

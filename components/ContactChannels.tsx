@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { LuChevronRight } from "react-icons/lu";
 import ChannelIcon from "@/components/ChannelIcon";
+import { useLanguage } from "@/components/LanguageProvider";
 import { CHANNEL_TYPES, type ContactInfo, channelDisplay, channelHref } from "@/lib/contact";
 
 // Fetched once per page load and shared by every instance on the page.
@@ -13,6 +14,7 @@ const load = () =>
 
 /** "ติดต่อเรา": the site's contact channels from /admin. Renders nothing until some are set. */
 export default function ContactChannels({ className = "", preview }: { className?: string; preview?: ContactInfo }) {
+  const { t } = useLanguage();
   const [loaded, setLoaded] = useState<ContactInfo | null>(null);
   useEffect(() => {
     if (!preview) load().then(setLoaded);
@@ -23,7 +25,9 @@ export default function ContactChannels({ className = "", preview }: { className
   return (
     <section className={`flex w-full flex-col items-center gap-3 ${className}`}>
       <div className="text-center">
-        <h2 className="text-base font-bold text-ink">{contact.heading}</h2>
+        <h2 className="text-base font-bold text-ink">
+          {contact.heading === "ติดต่อเรา" ? t("ติดต่อเรา", "Contact us") : contact.heading}
+        </h2>
         {contact.note && <p className="mt-0.5 max-w-md text-xs text-ink-3">{contact.note}</p>}
       </div>
       {/* Centred whatever the count: one channel shouldn't sit off to the side. */}

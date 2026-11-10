@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import DevCredit from "@/components/DevCredit";
+import { useLanguage } from "@/components/LanguageProvider";
 import PageBanner from "@/components/PageBanner";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
@@ -19,6 +20,7 @@ const PREVIEW = 30;
 
 /** Every reported plate as text, grouped by where it was found. */
 export default function Dashboard() {
+  const { locale, t } = useLanguage();
   const [reports, setReports] = useState<PublicReport[] | null>(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -30,7 +32,7 @@ export default function Dashboard() {
     fetch("/api/reports")
       .then((r) => r.json())
       .then(setReports)
-      .catch(() => setError("โหลดข้อมูลไม่สำเร็จ ลองรีเฟรชหน้า"));
+      .catch(() => setError("load"));
   }, []);
 
   // By spot: reports sent from the same place are one card, as on the map.
@@ -77,21 +79,24 @@ export default function Dashboard() {
   return (
     <>
       <PageBanner
-        title="ป้ายทะเบียนที่แจ้งพบ"
-        subtitle="ทุกป้ายที่มีผู้แจ้งพบ แยกตามจุดที่พบ · แตะป้ายเพื่อดูจุดรับคืนและช่องทางสำหรับติดต่อ"
+        title={t("ป้ายทะเบียนที่แจ้งพบ", "Reported license plates")}
+        subtitle={t(
+          "ทุกป้ายที่มีผู้แจ้งพบ แยกตามจุดที่พบ · แตะป้ายเพื่อดูจุดรับคืนและช่องทางสำหรับติดต่อ",
+          "All reported plates, grouped by location · Select a plate to view its collection point and contact details",
+        )}
       />
     <div className="mx-auto -mt-10 flex w-full max-w-6xl flex-col gap-4 px-4 pb-6 sm:-mt-12">
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="ป้ายที่แจ้งพบ" value={stats.plates} accent="text-brand" />
-        <Stat label="จุดที่พบ" value={stats.points} />
-        <Stat label="จังหวัด" value={stats.provinces} />
-        <Stat label="แจ้งใหม่ ≤ 3 วัน" value={stats.fresh} accent="text-emerald-400" />
+        <Stat label={t("ป้ายที่แจ้งพบ", "Reported plates")} value={stats.plates} locale={locale} accent="text-brand" />
+        <Stat label={t("จุดที่พบ", "Locations")} value={stats.points} locale={locale} />
+        <Stat label={t("จังหวัด", "Provinces")} value={stats.provinces} locale={locale} />
+        <Stat label={t("แจ้งใหม่ ≤ 3 วัน", "New ≤ 3 days")} value={stats.fresh} locale={locale} accent="text-emerald-400" />
       </div>
 
       {stats.top.length > 0 && (
         <section className="card p-4">
-          <h2 className="mb-3 text-sm font-bold">จังหวัดบนป้ายที่พบมากที่สุด</h2>
+          <h2 className="mb-3 text-sm font-bold">{t("จังหวัดบนป้ายที่พบมากที่สุด", "Provinces with the most found plates")}</h2>
           <ul className="flex flex-col gap-2">
             {stats.top.map(([name, n]) => (
               <li key={name}>
@@ -121,16 +126,22 @@ export default function Dashboard() {
         <input
           className="field md:flex-1"
           type="search"
-          placeholder="พิมพ์หมวดอักษรหรือเลข เช่น 3ฒน, 5702"
+          placeholder={t("พิมพ์หมวดอักษรหรือเลข เช่น 3ฒน, 5702", "Enter plate letters or number, e.g. 3ฒน or 5702")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <ProvinceInput className="md:w-64" value={province} onChange={setProvince} emptyLabel="ทุกจังหวัด" />
+        <ProvinceInput
+          className="md:w-64"
+          value={province}
+          onChange={setProvince}
+          placeholder={t("เลือกจังหวัด", "Select a province")}
+          emptyLabel={t("ทุกจังหวัด", "All provinces")}
+        />
         <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1 text-sm">
           {(
             [
-              ["new", "ล่าสุด"],
-              ["most", "ป้ายมากสุด"],
+              ["new", t("ล่าสุด", "Newest")],
+              ["most", t("ป้ายมากสุด", "Most plates")],
             ] as const
           ).map(([k, label]) => (
             <button
@@ -147,10 +158,10 @@ export default function Dashboard() {
 
       <p className="text-sm text-ink-3">
         {reports === null
-          ? "กำลังโหลด…"
+          ? t("กำลังโหลด…", "Loading…")
           : filtering
-            ? `พบ ${shown} ป้าย จาก ${groups.length} จุด`
-            : `ทั้งหมด ${shown} ป้าย จาก ${groups.length} จุด`}
+            ? locale === "en" ? `Found ${shown} plate(s) at ${groups.length} location(s)` : `พบ ${shown} ป้าย จาก ${groups.length} จุด`
+            : locale === "en" ? `${shown} plate(s) at ${groups.length} location(s) in total` : `ทั้งหมด ${shown} ป้าย จาก ${groups.length} จุด`}
         {filtering && (
           <button
             type="button"
@@ -160,11 +171,11 @@ export default function Dashboard() {
               setProvince("");
             }}
           >
-            ล้างตัวกรอง
+            {t("ล้างตัวกรอง", "Clear filters")}
           </button>
         )}
       </p>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-400">{t("โหลดข้อมูลไม่สำเร็จ ลองรีเฟรชหน้า", "Could not load data. Please refresh the page.")}</p>}
 
       <div className="grid items-start gap-3 md:grid-cols-2">
         {groups.map(({ report, plates }) => {
@@ -185,14 +196,16 @@ export default function Dashboard() {
                     {report.place ||
                       (report.lat !== null && report.lng !== null
                         ? `${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}`
-                        : "ไม่ได้ปักหมุด — แตะป้ายเพื่อดูจุดรับคืน")}
+                        : t("ไม่ได้ปักหมุด — แตะป้ายเพื่อดูจุดรับคืน", "No map marker — select a plate to view the collection point"))}
                   </h3>
                   <p className="text-xs text-ink-3">
-                    {times > 1 ? `แจ้ง ${times} ครั้ง · ล่าสุด ` : "แจ้งพบ "}
-                    {timeAgo(report.createdAt)} ·{" "}
+                    {times > 1
+                      ? locale === "en" ? `Reported ${times} times · latest ` : `แจ้ง ${times} ครั้ง · ล่าสุด `
+                      : t("แจ้งพบ ", "Reported ")}
+                    {timeAgo(report.createdAt, locale)} ·{" "}
                     {plates.length === report.plates.length
-                      ? `${plates.length} ป้าย`
-                      : `ตรง ${plates.length} จาก ${report.plates.length} ป้าย`}
+                      ? locale === "en" ? `${plates.length} plate(s)` : `${plates.length} ป้าย`
+                      : locale === "en" ? `${plates.length} of ${report.plates.length} plates match` : `ตรง ${plates.length} จาก ${report.plates.length} ป้าย`}
                   </p>
                 </div>
               </header>
@@ -202,7 +215,7 @@ export default function Dashboard() {
                   <li key={`${p.prefix}${p.number}${p.province}${i}`}>
                     <Link
                       href={href(searchPath(p.prefix, p.number, p.province))}
-                      title="ดูจุดรับคืนและช่องทางติดต่อ"
+                      title={t("ดูจุดรับคืนและช่องทางติดต่อ", "View collection point and contact details")}
                       className="block rounded-md transition hover:-translate-y-0.5 hover:ring-2 hover:ring-brand"
                     >
                       <PlateBadge prefix={p.prefix} number={p.number} province={p.province} size="sm" />
@@ -223,14 +236,16 @@ export default function Dashboard() {
                     })
                   }
                 >
-                  {open ? "ย่อ" : `แสดงทั้งหมด (${plates.length} ป้าย)`}
+                  {open
+                    ? t("ย่อ", "Collapse")
+                    : locale === "en" ? `Show all (${plates.length} plates)` : `แสดงทั้งหมด (${plates.length} ป้าย)`}
                 </button>
               )}
 
               {report.lat !== null && report.lng !== null && (
                 <footer className="mt-auto flex flex-wrap gap-2">
                   <Link href={href(reportPath(report.id))} className="btn-ghost px-3 py-1.5 text-sm">
-                    📍 ดูบนแผนที่
+                    📍 {t("ดูบนแผนที่", "View on map")}
                   </Link>
                   <a
                     className="btn-ghost px-3 py-1.5 text-sm"
@@ -238,7 +253,7 @@ export default function Dashboard() {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    นำทาง
+                    {t("นำทาง", "Directions")}
                   </a>
                 </footer>
               )}
@@ -249,7 +264,9 @@ export default function Dashboard() {
 
       {reports !== null && groups.length === 0 && (
         <p className="card p-4 text-sm text-ink-3">
-          {filtering ? "ไม่พบป้ายที่ตรงกับตัวกรอง" : "ยังไม่มีผู้แจ้งพบป้าย"}
+          {filtering
+            ? t("ไม่พบป้ายที่ตรงกับตัวกรอง", "No plates match these filters")
+            : t("ยังไม่มีผู้แจ้งพบป้าย", "No plates have been reported yet")}
         </p>
       )}
 
@@ -259,10 +276,10 @@ export default function Dashboard() {
   );
 }
 
-function Stat({ label, value, accent = "" }: { label: string; value: number; accent?: string }) {
+function Stat({ label, value, locale, accent = "" }: { label: string; value: number; locale: "th" | "en"; accent?: string }) {
   return (
     <div className="card p-4 shadow-md">
-      <div className={`text-3xl font-bold tabular-nums ${accent}`}>{value.toLocaleString("th-TH")}</div>
+      <div className={`text-3xl font-bold tabular-nums ${accent}`}>{value.toLocaleString(locale === "en" ? "en-US" : "th-TH")}</div>
       <div className="text-sm text-ink-3">{label}</div>
     </div>
   );

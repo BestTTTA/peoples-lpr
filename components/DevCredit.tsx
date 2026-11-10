@@ -1,15 +1,19 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import ContactChannels from "@/components/ContactChannels";
+import { useLanguage } from "@/components/LanguageProvider";
 import { PRIVACY_PATH, href } from "@/lib/urls";
 
 /** Footer credits: powered by Solutionmania and Ray of Light, developed by Thetigerteam Foundation Technology. */
 export default function DevCredit({ className = "" }: { className?: string }) {
+  const { t } = useLanguage();
   return (
     <div className={`flex flex-col items-center gap-1.5 text-xs text-ink-3 ${className}`}>
       <ContactChannels className="mb-4" />
       <Link href={href(PRIVACY_PATH)} className="font-semibold text-brand underline underline-offset-2">
-        นโยบายการเก็บข้อมูล
+        {t("นโยบายการเก็บข้อมูล", "Privacy policy")}
       </Link>
       <div className="flex items-center gap-2">
         <span>powered by</span>
@@ -19,7 +23,7 @@ export default function DevCredit({ className = "" }: { className?: string }) {
         <Image src="/ray-of-light.png" alt="Ray of Light" width={84} height={36} />
       </div>
       <div className="flex items-center gap-2">
-        <span>พัฒนาโดย</span>
+        <span>{t("พัฒนาโดย", "Developed by")}</span>
         <Image src="/thetigerteam.svg" alt="" width={22} height={23} className="rounded-sm" />
         <span className="font-semibold text-ink">Thetigerteam Foundation Technology</span>
       </div>

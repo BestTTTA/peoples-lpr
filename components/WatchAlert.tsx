@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import HitCard from "@/components/HitCard";
+import { useLanguage } from "@/components/LanguageProvider";
 import PlateBadge from "@/components/PlateBadge";
 import type { SearchHit } from "@/lib/types";
 import { href, reportPath } from "@/lib/urls";
@@ -14,6 +15,7 @@ type Found = { watch: Watch; hits: SearchHit[] };
  * Closing keeps the watch (it reminds again next visit); "เลิกตามหา" drops it.
  */
 export default function WatchAlert() {
+  const { t } = useLanguage();
   const [found, setFound] = useState<Found[]>([]);
 
   useEffect(() => {
@@ -64,11 +66,13 @@ export default function WatchAlert() {
           <div className="text-4xl leading-none">🎉</div>
           <div className="min-w-0 flex-1">
             <h2 id="watch-alert-title" className="text-lg font-bold text-emerald-400">
-              พบป้ายที่คุณฝากตามหาแล้ว!
+              {t("พบป้ายที่คุณฝากตามหาแล้ว!", "A plate from your alerts has been found!")}
             </h2>
-            <p className="text-sm text-ink-3">มีคนแจ้งพบป้ายที่คุณฝากไว้ ดูจุดรับคืนและช่องทางติดต่อด้านล่าง</p>
+            <p className="text-sm text-ink-3">
+              {t("มีคนแจ้งพบป้ายที่คุณฝากไว้ ดูจุดรับคืนและช่องทางติดต่อด้านล่าง", "Someone has reported your plate. See the collection point and contact details below.")}
+            </p>
           </div>
-          <button type="button" className="icon-btn shrink-0" aria-label="ปิด" onClick={() => setFound([])}>
+          <button type="button" className="icon-btn shrink-0" aria-label={t("ปิด", "Close")} onClick={() => setFound([])}>
             ✕
           </button>
         </div>
@@ -76,9 +80,9 @@ export default function WatchAlert() {
         {found.map(({ watch, hits }) => (
           <section key={`${watch.prefix}${watch.number}${watch.province}`} className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2 border-t border-line pt-3">
-              <PlateBadge prefix={watch.prefix} number={watch.number} province={watch.province} size="sm" emptyProvince="ทุกจังหวัด" />
+              <PlateBadge prefix={watch.prefix} number={watch.number} province={watch.province} size="sm" emptyProvince={t("ทุกจังหวัด", "All provinces")} />
               <button type="button" className="text-sm text-ink-3 hover:text-ink" onClick={() => stop(watch)}>
-                ได้คืนแล้ว / เลิกตามหา
+                {t("ได้คืนแล้ว / เลิกตามหา", "Collected / stop alert")}
               </button>
             </div>
             {hits.map((h) => (
@@ -95,7 +99,7 @@ export default function WatchAlert() {
         ))}
 
         <button type="button" className="btn-ghost" onClick={() => setFound([])}>
-          ปิด (เตือนอีกครั้งเมื่อกลับมา)
+          {t("ปิด (เตือนอีกครั้งเมื่อกลับมา)", "Close (remind me next time)")}
         </button>
       </div>
     </div>

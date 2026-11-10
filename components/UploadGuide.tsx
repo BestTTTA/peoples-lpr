@@ -1,3 +1,7 @@
+"use client";
+
+import { useLanguage } from "@/components/LanguageProvider";
+
 /** How-to for finders: photograph, box each plate, check the reading, pin. */
 
 const PLATES = [
@@ -9,10 +13,10 @@ const PLATES = [
   ["กบ 2736", "เพชรบุรี"],
 ];
 
-function Illustration() {
+function Illustration({ label }: { label: string }) {
   // Photo of plates laid on a table, two already boxed, a third being drawn.
   return (
-    <svg viewBox="0 0 300 170" className="w-full" role="img" aria-label="ตัวอย่างการตีกรอบป้ายทะเบียนในรูป">
+    <svg viewBox="0 0 300 170" className="w-full" role="img" aria-label={label}>
       <rect width="300" height="170" rx="10" fill="#c62a2a" />
       <rect x="0" y="0" width="300" height="18" fill="#8b5a3c" opacity=".5" />
       {PLATES.map(([t, p], i) => {
@@ -52,35 +56,44 @@ function Illustration() {
 
 const STEPS = [
   {
-    t: "ถ่ายรูปป้าย",
-    d: "วางป้ายบนพื้นเรียบ ถ่ายจากด้านบนตรงๆ ให้ตัวอักษรชัด ไม่มีแสงสะท้อน — รูปเดียวหลายป้ายได้ หรือเลือกหลายรูปพร้อมกันก็ได้",
+    th: "ถ่ายรูปป้าย",
+    en: "Photograph the plate",
+    thDescription: "วางป้ายบนพื้นเรียบ ถ่ายจากด้านบนตรงๆ ให้ตัวอักษรชัด ไม่มีแสงสะท้อน — รูปเดียวหลายป้ายได้ หรือเลือกหลายรูปพร้อมกันก็ได้",
+    enDescription: "Place the plate on a flat surface and photograph it straight from above. Keep the text clear and avoid glare. One photo may contain several plates, and you may select several photos at once.",
   },
   {
-    t: "ครอบป้าย: AI อัตโนมัติ หรือลากเอง",
-    d: "โหมด “AI ครอปให้” จะตีกรอบป้ายให้เอง ตรวจดูแล้วกด × ลบกรอบที่ผิด หรือลากเพิ่มป้ายที่ AI หาไม่เจอ · โหมด “ตีกรอบเอง” ลากนิ้ว/เมาส์ครอบทีละป้ายให้ติดทั้งเลขทะเบียนและชื่อจังหวัด ถ้ารูปมีป้ายเดียวเต็มรูป กด “ทั้งรูปคือ 1 ป้าย”",
+    th: "ครอบป้าย: AI อัตโนมัติ หรือลากเอง",
+    en: "Crop plates automatically or manually",
+    thDescription: "โหมด “AI ครอปให้” จะตีกรอบป้ายให้เอง ตรวจดูแล้วกด × ลบกรอบที่ผิด หรือลากเพิ่มป้ายที่ AI หาไม่เจอ · โหมด “ตีกรอบเอง” ลากนิ้ว/เมาส์ครอบทีละป้ายให้ติดทั้งเลขทะเบียนและชื่อจังหวัด ถ้ารูปมีป้ายเดียวเต็มรูป กด “ทั้งรูปคือ 1 ป้าย”",
+    enDescription: "AI crop draws boxes automatically. Remove incorrect boxes with × or draw any missing ones. In manual mode, draw around each complete plate, including its province. If one plate fills the photo, select “Use full photo as one plate”.",
   },
   {
-    t: "ตรวจสอบผลการอ่าน",
-    d: "ระบบอ่านเลขให้อัตโนมัติ แก้หมวดอักษร เลข และจังหวัดให้ตรงกับป้ายจริง ช่องที่ขึ้นสีเหลือง = ระบบไม่แน่ใจ ควรเช็คให้ดี",
+    th: "ตรวจสอบผลการอ่าน",
+    en: "Review the detected text",
+    thDescription: "ระบบอ่านเลขให้อัตโนมัติ แก้หมวดอักษร เลข และจังหวัดให้ตรงกับป้ายจริง ช่องที่ขึ้นสีเหลือง = ระบบไม่แน่ใจ ควรเช็คให้ดี",
+    enDescription: "The system reads each plate automatically. Correct the letters, number and province to match the real plate. Yellow fields indicate uncertain results.",
   },
   {
-    t: "ปักหมุดแล้วยืนยัน",
-    d: "ใช้ตำแหน่งปัจจุบันหรือแตะแผนที่เลือกจุดที่ป้ายอยู่ ใส่จุดรับคืน/ช่องทางติดต่อ แล้วกดยืนยันเพื่อขึ้นแผนที่",
+    th: "ปักหมุดแล้วยืนยัน",
+    en: "Set the location and confirm",
+    thDescription: "ใช้ตำแหน่งปัจจุบันหรือแตะแผนที่เลือกจุดที่ป้ายอยู่ ใส่จุดรับคืน/ช่องทางติดต่อ แล้วกดยืนยันเพื่อขึ้นแผนที่",
+    enDescription: "Use your current location or select the plate location on the map. Add collection and contact details, then confirm the report.",
   },
 ];
 
 export default function UploadGuide() {
+  const { t } = useLanguage();
   return (
     // Closed by default: the steps below already guide; this is for whoever wants more.
     <details className="group card overflow-hidden shadow-md">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm text-ink-3 hover:text-ink group-open:font-semibold group-open:text-ink">
         <span className="grid h-5 w-5 place-items-center rounded-full border border-current text-[11px]">?</span>
-        ดูวิธีถ่ายรูปและตีกรอบให้ได้ผลดี
+        {t("ดูวิธีถ่ายรูปและตีกรอบให้ได้ผลดี", "Photo and cropping guide")}
         <span className="ml-auto text-ink-3 transition group-open:rotate-180">▾</span>
       </summary>
       <div className="grid gap-4 border-t border-line p-4 md:grid-cols-[minmax(0,300px)_1fr]">
         <div className="flex flex-col gap-2">
-          <Illustration />
+          <Illustration label={t("ตัวอย่างการตีกรอบป้ายทะเบียนในรูป", "Example of drawing boxes around plates in a photo")} />
           <div className="grid grid-cols-2 gap-2 text-center text-xs">
             <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-2 text-emerald-300">
               <svg viewBox="0 0 100 50" className="mx-auto h-10">
@@ -89,7 +102,7 @@ export default function UploadGuide() {
                 <text x="50" y="37" textAnchor="middle" fontSize="6">เชียงใหม่</text>
                 <rect x="10" y="6" width="80" height="40" fill="none" stroke="#10b981" strokeWidth="2.5" />
               </svg>
-              ✓ กรอบพอดีป้าย เห็นจังหวัด
+              {t("✓ กรอบพอดีป้าย เห็นจังหวัด", "✓ Complete plate and province")}
             </div>
             <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-red-300">
               <svg viewBox="0 0 100 50" className="mx-auto h-10">
@@ -99,19 +112,19 @@ export default function UploadGuide() {
                 <text x="80" y="28" textAnchor="middle" fontSize="9" fontWeight="700">บล 21</text>
                 <rect x="20" y="4" width="62" height="24" fill="none" stroke="#ef4444" strokeWidth="2.5" />
               </svg>
-              ✗ กรอบคร่อม 2 ป้าย / ตัดจังหวัด
+              {t("✗ กรอบคร่อม 2 ป้าย / ตัดจังหวัด", "✗ Two plates or cropped province")}
             </div>
           </div>
         </div>
         <ol className="flex flex-col gap-3">
           {STEPS.map((s, i) => (
-            <li key={s.t} className="flex gap-3">
+            <li key={s.th} className="flex gap-3">
               <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand text-sm font-bold text-white">
                 {i + 1}
               </span>
               <div>
-                <div className="font-semibold">{s.t}</div>
-                <p className="text-sm text-ink-3">{s.d}</p>
+                <div className="font-semibold">{t(s.th, s.en)}</div>
+                <p className="text-sm text-ink-3">{t(s.thDescription, s.enDescription)}</p>
               </div>
             </li>
           ))}

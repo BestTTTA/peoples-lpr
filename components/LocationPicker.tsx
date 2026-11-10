@@ -2,6 +2,7 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Map as MLMap, Marker } from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
+import { useLanguage } from "@/components/LanguageProvider";
 import type { Place } from "@/lib/geocode";
 import { BRAND, createMap } from "@/lib/maps";
 
@@ -18,6 +19,7 @@ export default function LocationPicker({
   /** Open on the given pin (editing an existing location) instead of the default view. */
   centerOnValue?: boolean;
 }) {
+  const { locale, t } = useLanguage();
   const el = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MLMap | null>(null);
   const marker = useRef<Marker | null>(null);
@@ -135,18 +137,18 @@ export default function LocationPicker({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" className="btn-primary" onClick={locate} disabled={locating}>
-          {locating ? "กำลังหาตำแหน่ง…" : "📍 ใช้ตำแหน่งปัจจุบัน"}
+          {locating ? t("กำลังหาตำแหน่ง…", "Finding your location…") : t("📍 ใช้ตำแหน่งปัจจุบัน", "📍 Use current location")}
         </button>
-        <span className="text-sm text-ink-3">หรือค้นหาชื่อสถานที่ / แตะบนแผนที่ / ลากหมุด</span>
+        <span className="text-sm text-ink-3">{t("หรือค้นหาชื่อสถานที่ / แตะบนแผนที่ / ลากหมุด", "Or search for a place / select the map / drag the marker")}</span>
       </div>
-      {geoError && <p className="text-sm text-warn">{geoError}</p>}
+      {geoError && <p className="text-sm text-warn">{t(geoError)}</p>}
       <div className="relative">
         <div className="flex gap-2">
           <input
             className="field min-w-0 flex-1"
             type="search"
             enterKeyHint="search"
-            placeholder="ชื่อสถานที่ ซอย จังหวัด หรือวางลิงก์ Google Maps"
+            placeholder={t("ชื่อสถานที่ ซอย จังหวัด หรือวางลิงก์ Google Maps", "Place, street, province, or paste a Google Maps link")}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -169,18 +171,18 @@ export default function LocationPicker({
             }}
           />
           <button type="button" className="btn-ghost shrink-0" onClick={() => search()} disabled={searching}>
-            {searching ? "กำลังค้นหา…" : "ค้นหา"}
+            {searching ? t("กำลังค้นหา…", "Searching…") : t("ค้นหา", "Search")}
           </button>
         </div>
-        {searchError && <p className="mt-1 text-sm text-warn">{searchError}</p>}
+        {searchError && <p className="mt-1 text-sm text-warn">{t(searchError)}</p>}
         <p className="mt-1 text-xs text-ink-3">
-          มีหมุดใน Google Maps อยู่แล้ว? กด “แชร์” → คัดลอกลิงก์ แล้ววางในช่องนี้ได้เลย
+          {t("มีหมุดใน Google Maps อยู่แล้ว? กด “แชร์” → คัดลอกลิงก์ แล้ววางในช่องนี้ได้เลย", "Already have a Google Maps marker? Select “Share”, copy the link, and paste it here.")}
         </p>
         {places && (
           <ul className="card absolute inset-x-0 top-full z-10 mt-1 max-h-72 overflow-y-auto p-1">
             {places.length === 0 && (
               <li className="px-3 py-2 text-sm text-ink-3">
-                ไม่พบสถานที่นี้ ลองพิมพ์ชื่อสั้นลง หรือใส่อำเภอ/จังหวัด แล้วแตะบนแผนที่แทน
+                {t("ไม่พบสถานที่นี้ ลองพิมพ์ชื่อสั้นลง หรือใส่อำเภอ/จังหวัด แล้วแตะบนแผนที่แทน", "Place not found. Try a shorter name or add the district/province, then select it on the map.")}
               </li>
             )}
             {places.map((p, i) => (
@@ -204,7 +206,9 @@ export default function LocationPicker({
         </div>
       </div>
       <p className="text-xs text-ink-3">
-        {value ? `ตำแหน่งที่เลือก: ${value.lat.toFixed(5)}, ${value.lng.toFixed(5)}` : "ยังไม่ได้ปักหมุด"}
+        {value
+          ? locale === "en" ? `Selected location: ${value.lat.toFixed(5)}, ${value.lng.toFixed(5)}` : `ตำแหน่งที่เลือก: ${value.lat.toFixed(5)}, ${value.lng.toFixed(5)}`
+          : t("ยังไม่ได้ปักหมุด", "No map marker selected")}
       </p>
     </div>
   );

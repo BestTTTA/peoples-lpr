@@ -1,5 +1,6 @@
 "use client";
 import { useState, useSyncExternalStore } from "react";
+import { useLanguage } from "@/components/LanguageProvider";
 
 /**
  * Site-wide warning that this is a free coordination service and payments
@@ -27,6 +28,7 @@ function subscribe(cb: () => void): () => void {
 }
 
 export default function ScamWarningBanner() {
+  const { t } = useLanguage();
   // Shown in the server HTML so it is there on first paint (the page doesn't
   // jump when it arrives); a browser that dismissed it hides it on hydration.
   const dismissed = useSyncExternalStore(subscribe, readDismissed, () => "");
@@ -55,9 +57,9 @@ export default function ScamWarningBanner() {
               !
             </span>
             <span className="text-[13px] leading-snug sm:text-sm">
-              <b className="font-semibold text-warn">เว็บนี้ให้ใช้ฟรี</b>
+              <b className="font-semibold text-warn">{t("เว็บนี้ให้ใช้ฟรี", "This website is free")}</b>
               <span className="text-ink-3"> · </span>
-              ห้ามโอนเงินเด็ดขาด
+              {t("ห้ามโอนเงินเด็ดขาด", "Never transfer money")}
             </span>
             <button
               type="button"
@@ -65,24 +67,32 @@ export default function ScamWarningBanner() {
               aria-expanded={expanded}
               onClick={() => setExpanded((v) => !v)}
             >
-              {expanded ? "ซ่อน" : "ดูรายละเอียด"}
+              {expanded ? t("ซ่อน", "Hide") : t("ดูรายละเอียด", "Details")}
             </button>
           </div>
           {expanded && (
             <p className="mt-1.5 max-w-3xl pb-1 text-center text-xs leading-relaxed text-ink-3">
-              เว็บไซต์นี้เป็นเพียงสื่อกลางในการประสานงาน และตามหาป้ายทะเบียนรถยนต์/รถจักรยานยนต์ที่หลุดหายให้บริการฟรีต่อสาธารณะ
-              โดยจะไม่มีการเรียกร้องขอรับผลตอบแทนใด ๆ ทั้งสิ้น
+              {t(
+                "เว็บไซต์นี้เป็นเพียงสื่อกลางในการประสานงาน และตามหาป้ายทะเบียนรถยนต์/รถจักรยานยนต์ที่หลุดหายให้บริการฟรีต่อสาธารณะ โดยจะไม่มีการเรียกร้องขอรับผลตอบแทนใด ๆ ทั้งสิ้น",
+                "This website is a free public coordination service for finding lost car and motorcycle license plates. We never request payment or compensation of any kind.",
+              )}
               <br />
-              โปรดระวังมิจฉาชีพที่อ้างว่าเก็บป้ายของคุณไว้ แล้วขอค่าส่ง ค่ามัดจำ หรือค่าตอบแทน
+              {t(
+                "โปรดระวังมิจฉาชีพที่อ้างว่าเก็บป้ายของคุณไว้ แล้วขอค่าส่ง ค่ามัดจำ หรือค่าตอบแทน",
+                "Beware of scammers who claim to have your plate and ask for shipping fees, a deposit, or a reward.",
+              )}
               <br />
-              ถ้าเป็นไปได้ ให้เดินทางไปรับป้ายด้วยตนเอง และพกเล่มทะเบียนหรือบัตรประชาชนไปเพื่อยืนยันความเป็นเจ้าของ
+              {t(
+                "ถ้าเป็นไปได้ ให้เดินทางไปรับป้ายด้วยตนเอง และพกเล่มทะเบียนหรือบัตรประชาชนไปเพื่อยืนยันความเป็นเจ้าของ",
+                "If possible, collect the plate in person and bring the vehicle registration book or your ID to prove ownership.",
+              )}
             </p>
           )}
         </div>
         <button
           type="button"
           onClick={dismiss}
-          aria-label="ปิดคำเตือน"
+          aria-label={t("ปิดคำเตือน", "Close warning")}
           className="shrink-0 self-start rounded-full px-1.5 text-sm text-ink-3 transition hover:text-ink"
         >
           ✕

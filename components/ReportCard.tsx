@@ -1,9 +1,8 @@
 import { RECENCY, pinSvg, recencyOf } from "@/lib/recency";
 import type { PublicReport } from "@/lib/types";
 
-const rtf = new Intl.RelativeTimeFormat("th", { numeric: "auto" });
-
-export function timeAgo(iso: string): string {
+export function timeAgo(iso: string, locale: "th" | "en" = "th"): string {
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
   const mins = Math.round((new Date(iso).getTime() - Date.now()) / 60000);
   if (mins > -60) return rtf.format(mins, "minute");
   const hours = Math.round(mins / 60);

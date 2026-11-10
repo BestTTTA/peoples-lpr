@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import Linkified from "@/components/Linkified";
+import { useLanguage } from "@/components/LanguageProvider";
 import PhotoViewer from "@/components/PhotoViewer";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
@@ -14,6 +15,7 @@ type FeedbackType = "OWNER_RECEIVED" | "NOT_FOUND_AT_LOCATION";
 
 /** A search match: plate photo, where it was found, pickup note and contact, and actions. */
 export default function HitCard({ hit, active, onShow }: { hit: SearchHit; active: boolean; onShow: () => void }) {
+  const { locale, t } = useLanguage();
   const { plate, report } = hit;
   const photo = report.photos[plate.photo];
   const [viewing, setViewing] = useState<string | null>(null);
@@ -38,8 +40,10 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
 
   async function submitFeedback() {
     if (!feedbackType || busy) return;
-    const label = feedbackType === "OWNER_RECEIVED" ? "เจ้าของป้ายได้รับคืนแล้ว" : "ไม่พบป้าย ตามพิกัดที่แจ้ง";
-    if (!confirm(`ยืนยันส่งคำขอว่า “${label}”?`)) return;
+    const label = feedbackType === "OWNER_RECEIVED"
+      ? t("เจ้าของป้ายได้รับคืนแล้ว", "The owner has collected the plate")
+      : t("ไม่พบป้าย ตามพิกัดที่แจ้ง", "Plate not found at the reported location");
+    if (!confirm(locale === "en" ? `Submit the update “${label}”?` : `ยืนยันส่งคำขอว่า “${label}”?`)) return;
     feedbackRequestId.current ??= clientUuid();
     setBusy("feedback");
     setError("");
@@ -72,7 +76,10 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
       setError("ข้อมูลที่แก้ไขยังเหมือนเดิม");
       return;
     }
-    if (!confirm(`ยืนยันส่งคำขอแก้หมายเลขป้ายเป็น ${corrected.prefix} ${corrected.number} ${corrected.province || "ไม่ระบุจังหวัด"}?`)) return;
+    const correctedProvince = corrected.province || t("ไม่ระบุจังหวัด", "Province not specified");
+    if (!confirm(locale === "en"
+      ? `Submit a request to change the plate number to ${corrected.prefix} ${corrected.number} ${correctedProvince}?`
+      : `ยืนยันส่งคำขอแก้หมายเลขป้ายเป็น ${corrected.prefix} ${corrected.number} ${correctedProvince}?`)) return;
     correctionRequestId.current ??= clientUuid();
     setBusy("correction");
     setError("");
@@ -101,7 +108,7 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
           {/* eslint-disable-next-line @next/next/no-img-element -- user uploads served from our API */}
           <img
             src={`/api/files/${plate.crop}`}
-            alt="รูปป้ายที่พบ"
+            alt={t("รูปป้ายที่พบ", "Found license plate")}
             className="h-[70px] w-[96px] rounded-[3px] bg-black object-contain"
           />
           <RecencyBadge createdAt={report.createdAt} />
@@ -112,33 +119,33 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
             {report.place ||
               (report.lat !== null && report.lng !== null
                 ? `${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}`
-                : "ไม่ได้ปักหมุด — ดูจุดรับคืนด้านล่าง")}
+                : t("ไม่ได้ปักหมุด — ดูจุดรับคืนด้านล่าง", "No map marker — see the collection point below"))}
           </span>
-          <span className="block text-xs text-ink-3/80">พบ {timeAgo(report.createdAt)}</span>
+          <span className="block text-xs text-ink-3/80">{t("พบ", "Found")} {timeAgo(report.createdAt, locale)}</span>
         </span>
       </button>
       {(report.note || report.contact || report.sourceUrl) && (
         <div className="rounded-lg border border-line px-3 py-2 text-sm">
           {report.note && (
             <p>
-              <span className="text-ink-3">จุดรับคืน:</span> <Linkified text={report.note} />
+              <span className="text-ink-3">{t("จุดรับคืน:", "Collection point:")}</span> <Linkified text={report.note} />
             </p>
           )}
           {report.contact && (
             <p>
-              <span className="text-ink-3">ติดต่อ:</span> <Linkified text={report.contact} />
+              <span className="text-ink-3">{t("ติดต่อ:", "Contact:")}</span> <Linkified text={report.contact} />
             </p>
           )}
           {report.sourceUrl && (
             <p className="break-all">
-              <span className="text-ink-3">โพสต์ต้นทาง:</span>{" "}
+              <span className="text-ink-3">{t("โพสต์ต้นทาง:", "Original post:")}</span>{" "}
               <a
                 href={report.sourceUrl}
                 target="_blank"
                 rel="noopener noreferrer nofollow ugc"
                 className="font-semibold text-brand underline"
               >
-                ดูโพสต์ต้นทาง ↗
+                {t("ดูโพสต์ต้นทาง ↗", "View original post ↗")}
               </a>
             </p>
           )}
@@ -148,7 +155,7 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
         {report.lat !== null && report.lng !== null && (
           <>
             <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={onShow}>
-              📍 ดูบนแผนที่
+              📍 {t("ดูบนแผนที่", "View on map")}
             </button>
             <a
               className="btn-ghost px-3 py-1.5 text-sm"
@@ -156,13 +163,13 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
               target="_blank"
               rel="noreferrer"
             >
-              นำทาง
+              {t("นำทาง", "Directions")}
             </a>
           </>
         )}
         {photo && (
           <button type="button" className="btn-ghost px-3 py-1.5 text-sm" onClick={() => setViewing(`/api/files/${photo}`)}>
-            รูปเต็ม
+            {t("รูปเต็ม", "Full photo")}
           </button>
         )}
         <button
@@ -174,7 +181,7 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
             setError("");
           }}
         >
-          แจ้งปรับปรุงข้อมูล
+          {t("แจ้งปรับปรุงข้อมูล", "Request an information update")}
         </button>
         <button
           type="button"
@@ -185,14 +192,14 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
             setError("");
           }}
         >
-          ขอแก้ไขหมายเลขป้าย
+          {t("ขอแก้ไขหมายเลขป้าย", "Correct plate number")}
         </button>
       </div>
 
       {feedbackOpen && (
         <div className="flex flex-col gap-2 rounded-lg border border-line p-3 text-sm">
           <label className="font-medium">
-            ข้อมูลที่ต้องการแจ้ง
+            {t("ข้อมูลที่ต้องการแจ้ง", "Update type")}
             <select
               className="field mt-1"
               value={feedbackType}
@@ -201,13 +208,13 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
                 feedbackRequestId.current = null;
               }}
             >
-              <option value="">เลือกสถานะ</option>
-              <option value="OWNER_RECEIVED">เจ้าของป้ายได้รับคืนแล้ว</option>
-              <option value="NOT_FOUND_AT_LOCATION">ไม่พบป้าย ตามพิกัดที่แจ้ง</option>
+              <option value="">{t("เลือกสถานะ", "Select status")}</option>
+              <option value="OWNER_RECEIVED">{t("เจ้าของป้ายได้รับคืนแล้ว", "The owner has collected the plate")}</option>
+              <option value="NOT_FOUND_AT_LOCATION">{t("ไม่พบป้าย ตามพิกัดที่แจ้ง", "Plate not found at the reported location")}</option>
             </select>
           </label>
           <button type="button" className="btn-primary" disabled={!feedbackType || !!busy} onClick={submitFeedback}>
-            {busy === "feedback" ? "กำลังส่งคำขอ…" : "ส่งคำขอปรับปรุง"}
+            {busy === "feedback" ? t("กำลังส่งคำขอ…", "Submitting…") : t("ส่งคำขอปรับปรุง", "Submit update request")}
           </button>
         </div>
       )}
@@ -215,21 +222,21 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
       {correctionOpen && (
         <div className="flex flex-col gap-2 rounded-lg border border-line p-3 text-sm">
           <p className="text-ink-3">
-            ค่าปัจจุบัน: <b className="text-ink">{displayPlate.prefix} {displayPlate.number} {displayPlate.province || "ไม่ระบุจังหวัด"}</b>
+            {t("ค่าปัจจุบัน:", "Current value:")} <b className="text-ink">{displayPlate.prefix} {displayPlate.number} {displayPlate.province || t("ไม่ระบุจังหวัด", "Province not specified")}</b>
           </p>
           {plate.aiDetected && (plate.aiDetected.prefix || plate.aiDetected.number || plate.aiDetected.province) && (
             <p className="text-xs text-ink-3">
-              AI อ่านเดิม: {plate.aiDetected.raw || `${plate.aiDetected.prefix || "–"} ${plate.aiDetected.number || "–"}`} {plate.aiDetected.province || "ไม่ระบุจังหวัด"}
+              {t("AI อ่านเดิม:", "Original AI reading:")} {plate.aiDetected.raw || `${plate.aiDetected.prefix || "–"} ${plate.aiDetected.number || "–"}`} {plate.aiDetected.province || t("ไม่ระบุจังหวัด", "Province not specified")}
             </p>
           )}
           {plate.correctedAt && plate.original && (
             <p className="text-xs text-ink-3">
-              ข้อมูลก่อนแก้ล่าสุด: {plate.original.prefix} {plate.original.number} {plate.original.province || "ไม่ระบุจังหวัด"}
+              {t("ข้อมูลก่อนแก้ล่าสุด:", "Previous value before correction:")} {plate.original.prefix} {plate.original.number} {plate.original.province || t("ไม่ระบุจังหวัด", "Province not specified")}
             </p>
           )}
           <div className="grid grid-cols-2 gap-2">
             <label className="font-medium">
-              หมวดอักษรที่ถูกต้อง
+              {t("หมวดอักษรที่ถูกต้อง", "Correct plate letters")}
               <input
                 className="field mt-1"
                 maxLength={5}
@@ -241,7 +248,7 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
               />
             </label>
             <label className="font-medium">
-              เลขทะเบียนที่ถูกต้อง
+              {t("เลขทะเบียนที่ถูกต้อง", "Correct plate number")}
               <input
                 className="field mt-1"
                 inputMode="numeric"
@@ -255,7 +262,7 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
             </label>
           </div>
           <label className="font-medium">
-            จังหวัด
+            {t("จังหวัด", "Province")}
             <ProvinceInput
               className="mt-1"
               value={province}
@@ -263,18 +270,18 @@ export default function HitCard({ hit, active, onShow }: { hit: SearchHit; activ
                 setProvince(value);
                 correctionRequestId.current = null;
               }}
-              emptyLabel="ไม่ระบุจังหวัด"
+              emptyLabel={t("ไม่ระบุจังหวัด", "Province not specified")}
             />
           </label>
           <button type="button" className="btn-primary" disabled={!correctionValid || !!busy} onClick={submitCorrection}>
-            {busy === "correction" ? "กำลังส่งคำขอ…" : "ส่งคำขอแก้ไข"}
+            {busy === "correction" ? t("กำลังส่งคำขอ…", "Submitting…") : t("ส่งคำขอแก้ไข", "Submit correction")}
           </button>
         </div>
       )}
 
-      {message && <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">{message}</p>}
-      {error && <p className="text-sm text-warn">{error}</p>}
-      {viewing && <PhotoViewer src={viewing} alt="รูปที่ผู้แจ้งถ่ายไว้" onClose={() => setViewing(null)} />}
+      {message && <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">{t(message)}</p>}
+      {error && <p className="text-sm text-warn">{t(error)}</p>}
+      {viewing && <PhotoViewer src={viewing} alt={t("รูปที่ผู้แจ้งถ่ายไว้", "Photo provided by the reporter")} onClose={() => setViewing(null)} />}
     </article>
   );
 }

@@ -11,6 +11,7 @@ import type {
   SymbolLayerSpecification,
 } from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
+import { useLanguage, type Locale } from "@/components/LanguageProvider";
 import { BRAND, FONT, createMap } from "@/lib/maps";
 import { RECENCY, type Recency, pinSvg, recencyOf } from "@/lib/recency";
 import type { PublicReport } from "@/lib/types";
@@ -25,31 +26,32 @@ const PIN_PX = 36;
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-const dateFmt = new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "short" });
-
 const POPUP_CHIPS = 60;
 
-function popupHtml(spot: Spot): string {
+function popupHtml(spot: Spot, locale: Locale): string {
   const { plates } = spot;
+  const dateFmt = new Intl.DateTimeFormat(locale === "en" ? "en" : "th-TH", { dateStyle: "medium", timeStyle: "short" });
   const chips = plates
     .slice(0, POPUP_CHIPS)
     .map(
       (p) =>
         `<a class="plate-chip" href="${esc(href(searchPath(p.prefix, p.number, p.province)))}"><b>${esc(
           `${p.prefix} ${p.number}`,
-        )}</b><small>${esc(p.province || "ไม่ระบุจังหวัด")}</small></a>`,
+        )}</b><small>${esc(p.province || (locale === "en" ? "Province not specified" : "ไม่ระบุจังหวัด"))}</small></a>`,
     )
     .join("");
   const more = plates.length - POPUP_CHIPS;
   return `<div>
-    <div class="plate-popup-title">พบป้ายทะเบียน ${plates.length} ป้าย${
-      spot.reportIds.length > 1 ? ` <small>(แจ้ง ${spot.reportIds.length} ครั้ง)</small>` : ""
+    <div class="plate-popup-title">${locale === "en" ? `${plates.length} reported plate(s)` : `พบป้ายทะเบียน ${plates.length} ป้าย`}${
+      spot.reportIds.length > 1
+        ? ` <small>${locale === "en" ? `(reported ${spot.reportIds.length} times)` : `(แจ้ง ${spot.reportIds.length} ครั้ง)`}</small>`
+        : ""
     }</div>
     ${spot.place ? `<div class="plate-popup-place">${esc(spot.place)}</div>` : ""}
-    <div class="plate-popup-date">ล่าสุด ${esc(dateFmt.format(new Date(spot.createdAt)))}</div>
+    <div class="plate-popup-date">${locale === "en" ? "Latest" : "ล่าสุด"} ${esc(dateFmt.format(new Date(spot.createdAt)))}</div>
     <div class="plate-popup-chips">${chips}</div>
-    ${more > 0 ? `<div class="plate-popup-hint">และอีก ${more} ป้าย</div>` : ""}
-    <div class="plate-popup-hint">แตะป้ายเพื่อดูจุดรับคืนและช่องทางติดต่อ</div>
+    ${more > 0 ? `<div class="plate-popup-hint">${locale === "en" ? `${more} more plate(s)` : `และอีก ${more} ป้าย`}</div>` : ""}
+    <div class="plate-popup-hint">${locale === "en" ? "Select a plate to view its collection point and contact details" : "แตะป้ายเพื่อดูจุดรับคืนและช่องทางติดต่อ"}</div>
   </div>`;
 }
 
@@ -98,6 +100,7 @@ export default function FoundMap({
   focus: Focus | null;
   onSelect?: (id: string) => void;
 }) {
+  const { locale } = useLanguage();
   const el = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MLMap | null>(null);
   const reportsRef = useRef(reports);
@@ -228,10 +231,10 @@ export default function FoundMap({
       const spot = toSpots(pinned(reportsRef.current)).find((x) => x.reportIds.includes(r.id)) ?? { ...r, reportIds: [r.id] };
       popupRef.current = new mlRef.current.Popup({ offset: 28, maxWidth: "300px" })
         .setLngLat([spot.lng as number, spot.lat as number])
-        .setHTML(popupHtml(spot))
+        .setHTML(popupHtml(spot, locale))
         .addTo(map);
     }
-  }, [map, focus]);
+  }, [map, focus, locale]);
 
   return (
     <div className="relative h-full w-full">

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import DevCredit from "@/components/DevCredit";
 import FoundMap, { type Focus } from "@/components/FoundMap";
 import HitCard from "@/components/HitCard";
+import { useLanguage } from "@/components/LanguageProvider";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
 import { timeAgo } from "@/components/ReportCard";
@@ -55,6 +56,7 @@ export default function FindView({
   /** From /ค้นหา/<plate>: fill the form in and search straight away. */
   initialSearch: PlateQuery | null;
 }) {
+  const { locale, t } = useLanguage();
   const [reports, setReports] = useState<PublicReport[]>([]);
   const [focus, setFocus] = useState<Focus | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -228,7 +230,7 @@ export default function FindView({
       </div>
       <div className="flex flex-col gap-3 border-t border-line p-4 sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1">
-          <div className="text-xs text-ink-3">จุดพบ / จุดรับคืน</div>
+          <div className="text-xs text-ink-3">{t("จุดพบ / จุดรับคืน", "Found / collection point")}</div>
           <div className="font-semibold">{focusReport?.place || `${focus.lat.toFixed(5)}, ${focus.lng.toFixed(5)}`}</div>
           {focusNote && <p className="text-sm text-ink-3">{focusNote}</p>}
         </div>
@@ -238,7 +240,7 @@ export default function FindView({
           target="_blank"
           rel="noreferrer"
         >
-          🧭 นำทางด้วย Google Maps
+          🧭 {t("นำทางด้วย Google Maps", "Directions with Google Maps")}
         </a>
       </div>
     </section>
@@ -250,15 +252,20 @@ export default function FindView({
         <div className="mx-auto w-full max-w-[830px] px-4 py-6 text-center sm:py-9">
           <div className="flex flex-wrap items-center justify-center gap-2">
             <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white">
-              สำหรับเจ้าของป้ายที่ทำหล่นหรือสูญหาย
+              {t("สำหรับเจ้าของป้ายที่ทำหล่นหรือสูญหาย", "For owners of lost or missing plates")}
             </span>
             <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-brand">
-              ค้นหาฟรี · ไม่เรียกเก็บเงิน
+              {t("ค้นหาฟรี · ไม่เรียกเก็บเงิน", "Free search · no fees")}
             </span>
           </div>
-          <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-5xl">ป้ายของคุณหายใช่ไหม?</h1>
+          <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-5xl">
+            {t("ป้ายของคุณหายใช่ไหม?", "Is your license plate missing?")}
+          </h1>
           <p className="mt-2 text-white/85 sm:text-lg">
-            กรอกเลขทะเบียนเพื่อเช็กว่ามีผู้แจ้งพบแล้วหรือยัง ดูตำแหน่งบนแผนที่ และฝากตามหาไว้ได้
+            {t(
+              "กรอกเลขทะเบียนเพื่อเช็กว่ามีผู้แจ้งพบแล้วหรือยัง ดูตำแหน่งบนแผนที่ และฝากตามหาไว้ได้",
+              "Enter the plate number to see whether it has been reported, view the location, or leave a missing-plate alert.",
+            )}
           </p>
 
           <form
@@ -269,12 +276,12 @@ export default function FindView({
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_230px_auto] md:items-end">
               <label className="text-sm font-medium">
                 <span className="mb-1 flex items-center gap-1.5">
-                  <i className="h-2 w-2 rounded-full bg-sky" /> ทะเบียนรถ
+                  <i className="h-2 w-2 rounded-full bg-sky" /> {t("ทะเบียนรถ", "License plate")}
                 </span>
                 <input
                   ref={plateInput}
                   className={`field py-3.5 text-xl ${touched && !plateOk ? "border-warn" : ""}`}
-                  placeholder="เช่น 3ฒน 5702"
+                  placeholder={locale === "en" ? "e.g. 3ฒน 5702" : "เช่น 3ฒน 5702"}
                   value={plateText}
                   maxLength={14}
                   autoComplete="off"
@@ -285,40 +292,55 @@ export default function FindView({
 
               <label className="text-sm font-medium">
                 <span className="mb-1 flex items-center gap-1.5">
-                  <i className="h-2 w-2 rounded-full bg-warn" /> จังหวัด
-                  <span className="font-normal text-ink-3">(ไม่บังคับ)</span>
+                  <i className="h-2 w-2 rounded-full bg-warn" /> {t("จังหวัด", "Province")}
+                  <span className="font-normal text-ink-3">{t("(ไม่บังคับ)", "(Optional)")}</span>
                 </span>
                 <ProvinceInput
                   className="[&_.field]:py-3.5 [&_.field]:text-lg"
                   value={province}
                   onChange={setProvince}
-                  emptyLabel="ทุกจังหวัด"
+                  placeholder={t("เลือกจังหวัด", "Select a province")}
+                  emptyLabel={t("ทุกจังหวัด", "All provinces")}
                 />
               </label>
 
               <button type="submit" className="btn-primary px-7 py-3.5 text-lg" disabled={loading}>
                 <SearchIcon className="h-5 w-5" />
-                {loading ? "กำลังค้นหา…" : "ค้นหา"}
+                {loading ? t("กำลังค้นหา…", "Searching…") : t("ค้นหา", "Search")}
               </button>
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-              <PlateBadge prefix={clean(parsed.prefix)} number={parsed.number} province={province} size="sm" emptyProvince="ทุกจังหวัด" />
-              <span className="text-xs text-ink-3">พิมพ์ติดกัน เว้นวรรค หรือใช้ขีดได้ เช่น 3ฒน5702, 3ฒน 5702</span>
+              <PlateBadge
+                prefix={clean(parsed.prefix)}
+                number={parsed.number}
+                province={province}
+                size="sm"
+                emptyProvince={t("ทุกจังหวัด", "All provinces")}
+              />
+              <span className="text-xs text-ink-3">
+                {t(
+                  "พิมพ์ติดกัน เว้นวรรค หรือใช้ขีดได้ เช่น 3ฒน5702, 3ฒน 5702",
+                  "Type continuously, with a space, or with a dash, e.g. 3ฒน5702 or 3ฒน 5702.",
+                )}
+              </span>
             </div>
 
             {touched && !plateOk && (
               <p className="mt-2 text-xs text-warn">
-                กรอกทะเบียนให้ครบ: หมวดอักษรไทย 1–2 ตัว (มีเลขนำหน้าได้) แล้วตามด้วยเลข 1–4 หลัก เช่น 3ฒน 5702
+                {t(
+                  "กรอกทะเบียนให้ครบ: หมวดอักษรไทย 1–2 ตัว (มีเลขนำหน้าได้) แล้วตามด้วยเลข 1–4 หลัก เช่น 3ฒน 5702",
+                  "Enter a complete Thai plate: 1–2 Thai letters (an initial digit is allowed), followed by 1–4 digits, e.g. 3ฒน 5702.",
+                )}
               </p>
             )}
-            {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+            {error && <p className="mt-2 text-sm text-red-400">{t(error)}</p>}
           </form>
 
           <p className="mt-4 text-sm text-white/85">
-            ส่วนนี้ใช้เมื่อป้ายของคุณหาย · พบหรือเก็บป้ายของผู้อื่นได้?{" "}
+            {t("ส่วนนี้ใช้เมื่อป้ายของคุณหาย · พบหรือเก็บป้ายของผู้อื่นได้?", "This section is for your own missing plate · Found someone else’s plate?")}{" "}
             <Link href={href(REPORT_PATH)} className="font-semibold text-white underline">
-              ไปแจ้งป้ายที่พบ →
+              {t("ไปแจ้งป้ายที่พบ →", "Report a found plate →")}
             </Link>
           </p>
         </div>
@@ -333,7 +355,9 @@ export default function FindView({
           <div ref={resultsRef} className="flex scroll-mt-4 flex-col gap-4">
             {results.exact.length > 0 ? (
               <section className="card flex flex-col gap-2 p-4">
-                <h2 className="font-bold text-emerald-400">🎉 พบป้ายของคุณ {results.exact.length} รายการ</h2>
+                <h2 className="font-bold text-emerald-400">
+                  {locale === "en" ? `🎉 Found ${results.exact.length} matching plate(s)` : `🎉 พบป้ายของคุณ ${results.exact.length} รายการ`}
+                </h2>
                 {results.exact.map((h) => (
                   <HitCard key={h.plate.id} hit={h} active={selected === h.report.id} onShow={() => showHit(h)} />
                 ))}
@@ -341,13 +365,13 @@ export default function FindView({
             ) : (
               <section className="card flex flex-col gap-3 p-4 text-sm">
                 <div>
-                  <b className="text-base">ยังไม่พบป้ายนี้</b>
+                  <b className="text-base">{t("ยังไม่พบป้ายนี้", "This plate has not been found yet")}</b>
                   <p className="mt-1 text-ink-3">
-                    ลองตรวจสอบหมวดอักษรและจังหวัดอีกครั้ง หรือฝากตามหาไว้ — มีผู้แจ้งพบป้ายเพิ่มขึ้นทุกวัน
+                    {t("ลองตรวจสอบหมวดอักษรและจังหวัดอีกครั้ง หรือฝากตามหาไว้ — มีผู้แจ้งพบป้ายเพิ่มขึ้นทุกวัน", "Check the letters and province again, or create an alert — new plates are reported every day.")}
                   </p>
                 </div>
                 <button type="button" className="btn-primary self-start" onClick={() => setPopup(true)}>
-                  🔔 ฝากตามหาป้ายนี้
+                  {t("🔔 ฝากตามหาป้ายนี้", "🔔 Create an alert for this plate")}
                 </button>
               </section>
             )}
@@ -357,8 +381,8 @@ export default function FindView({
             {results.near.length > 0 && (
               <section className="card flex flex-col gap-2 p-4">
                 <h2 className="text-sm font-bold">
-                  ป้ายที่ใกล้เคียง{" "}
-                  <span className="font-normal text-ink-3">(อาจอ่านผิด 1 ตัว หรือจังหวัดคลาดเคลื่อน)</span>
+                  {t("ป้ายที่ใกล้เคียง", "Similar plates")}{" "}
+                  <span className="font-normal text-ink-3">{t("(อาจอ่านผิด 1 ตัว หรือจังหวัดคลาดเคลื่อน)", "(One character or the province may differ)")}</span>
                 </h2>
                 {results.near.map((h) => (
                   <HitCard key={h.plate.id} hit={h} active={selected === h.report.id} onShow={() => showHit(h)} />
@@ -401,6 +425,7 @@ function SearchPopup({
   nearCount: number;
   onClose: () => void;
 }) {
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
   const [watchError, setWatchError] = useState(false);
   const [serverForm, setServerForm] = useState(false);
@@ -440,11 +465,11 @@ function SearchPopup({
           <div className="text-4xl leading-none">🔍</div>
           <div className="min-w-0 flex-1">
             <h2 id="search-popup-title" className="text-lg font-bold">
-              ยังไม่มีข้อมูลป้ายทะเบียนนี้
+              {t("ยังไม่มีข้อมูลป้ายทะเบียนนี้", "No information for this plate yet")}
             </h2>
-            <p className="text-sm text-ink-3">ยังไม่มีผู้แจ้งพบป้ายนี้ในระบบ</p>
+            <p className="text-sm text-ink-3">{t("ยังไม่มีผู้แจ้งพบป้ายนี้ในระบบ", "No one has reported this plate yet.")}</p>
           </div>
-          <button type="button" className="icon-btn shrink-0" aria-label="ปิด" onClick={onClose}>
+          <button type="button" className="icon-btn shrink-0" aria-label={t("ปิด", "Close")} onClick={onClose}>
             ✕
           </button>
         </div>
@@ -455,31 +480,31 @@ function SearchPopup({
             number={query.number}
             province={query.province}
             size="sm"
-            emptyProvince="ทุกจังหวัด"
+            emptyProvince={t("ทุกจังหวัด", "All provinces")}
           />
         </div>
 
         <ul className="list-disc space-y-1 pl-5 text-sm text-ink-3">
-          <li>ตรวจหมวดอักษร เลขทะเบียน และจังหวัดอีกครั้ง</li>
-          <li>มีผู้แจ้งพบป้ายเพิ่มขึ้นทุกวัน กดฝากตามหาไว้ แล้วเราจะเตือนเมื่อกลับมาเปิดเว็บนี้</li>
+          <li>{t("ตรวจหมวดอักษร เลขทะเบียน และจังหวัดอีกครั้ง", "Check the plate letters, number, and province again.")}</li>
+          <li>{t("มีผู้แจ้งพบป้ายเพิ่มขึ้นทุกวัน กดฝากตามหาไว้ แล้วเราจะเตือนเมื่อกลับมาเปิดเว็บนี้", "New plates are reported every day. Create an alert and we will notify you when you return to this browser.")}</li>
         </ul>
         {watched ? (
           <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
-            🔔 ฝากตามหาแล้ว — เมื่อมีคนแจ้งพบป้ายนี้ จะมีแจ้งเตือนตอนคุณกลับมาเปิดเว็บ (ในเครื่องและเบราว์เซอร์นี้)
+            {t("🔔 ฝากตามหาแล้ว — เมื่อมีคนแจ้งพบป้ายนี้ จะมีแจ้งเตือนตอนคุณกลับมาเปิดเว็บ (ในเครื่องและเบราว์เซอร์นี้)", "🔔 Alert created — you will be notified when you return in this browser if someone reports this plate.")}
           </p>
         ) : (
           <button type="button" className="btn-ghost" onClick={() => (addWatch(query) ? null : setWatchError(true))}>
-            🔔 ฝากตามหาแบบเตือนในเบราว์เซอร์นี้
+            {t("🔔 ฝากตามหาแบบเตือนในเบราว์เซอร์นี้", "🔔 Create a browser alert")}
           </button>
         )}
         {watchError && (
-          <p className="text-sm text-warn">เบราว์เซอร์นี้ไม่อนุญาตให้บันทึก (อาจเป็นโหมดไม่ระบุตัวตน) — ใช้ลิงก์ด้านล่างแทน</p>
+          <p className="text-sm text-warn">{t("เบราว์เซอร์นี้ไม่อนุญาตให้บันทึก (อาจเป็นโหมดไม่ระบุตัวตน) — ใช้ลิงก์ด้านล่างแทน", "This browser cannot save the alert (possibly private browsing) — use the link below instead.")}</p>
         )}
 
         {serverCode ? (
           <div className="rounded-xl border border-emerald-500/50 bg-emerald-500/10 p-3 text-sm">
-            <b className="text-emerald-400">📮 ฝากตามหาเรียบร้อยแล้ว</b>
-            <p className="mt-1 text-ink-3">เก็บรหัสนี้ไว้สำหรับแก้ไขหรือยกเลิกรายการ</p>
+            <b className="text-emerald-400">{t("📮 ฝากตามหาเรียบร้อยแล้ว", "📮 Missing-plate alert created")}</b>
+            <p className="mt-1 text-ink-3">{t("เก็บรหัสนี้ไว้สำหรับแก้ไขหรือยกเลิกรายการ", "Keep this code to edit or cancel the alert.")}</p>
             <div className="mt-2 flex items-center gap-2">
               <code className="flex-1 rounded-lg bg-surface px-3 py-2 text-center text-xl font-bold tracking-[0.3em] text-ink">
                 {serverCode}
@@ -489,35 +514,35 @@ function SearchPopup({
                 className="btn-ghost px-3 py-2 text-sm"
                 onClick={() => navigator.clipboard.writeText(serverCode).catch(() => {})}
               >
-                คัดลอก
+                {t("คัดลอก", "Copy")}
               </button>
             </div>
-            <p className="mt-2 text-xs text-warn">นี่คือรหัสที่คุณกำหนด กรุณาจดเก็บไว้ก่อนปิดหน้าต่าง</p>
+            <p className="mt-2 text-xs text-warn">{t("นี่คือรหัสที่คุณกำหนด กรุณาจดเก็บไว้ก่อนปิดหน้าต่าง", "This is the code you chose. Save it before closing this dialog.")}</p>
           </div>
         ) : serverWatched ? (
           <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">
-            📮 ฝากตามหาเรียบร้อยแล้ว — ผู้แจ้งพบป้ายนี้จะเห็นเบอร์คุณและติดต่อกลับได้ทันที
+            {t("📮 ฝากตามหาเรียบร้อยแล้ว — ผู้แจ้งพบป้ายนี้จะเห็นเบอร์คุณและติดต่อกลับได้ทันที", "📮 Alert created — anyone who reports this plate can see your phone number and contact you.")}
           </p>
         ) : serverForm ? (
           <WatchRequestForm query={query} onDone={setServerCode} />
         ) : (
           <button type="button" className="btn-primary" onClick={() => setServerForm(true)}>
-            📮 ฝากตามหา + ทิ้งเบอร์ให้ผู้แจ้งพบติดต่อ
+            {t("📮 ฝากตามหา + ทิ้งเบอร์ให้ผู้แจ้งพบติดต่อ", "📮 Create an alert with contact details")}
           </button>
         )}
         <div className="flex flex-wrap gap-2">
           {nearCount > 0 && (
             <button type="button" className="btn-primary px-3 py-1.5 text-sm" onClick={onClose}>
-              ดูป้ายที่ใกล้เคียง ({nearCount})
+              {t(`ดูป้ายที่ใกล้เคียง (${nearCount})`, `View similar plates (${nearCount})`)}
             </button>
           )}
           <button type="button" className="btn-ghost px-3 py-1.5 text-sm" onClick={copyLink}>
-            {copied ? "✓ คัดลอกลิงก์แล้ว" : "🔗 คัดลอกลิงก์ไว้ค้นหาอีกครั้ง"}
+            {copied ? t("✓ คัดลอกลิงก์แล้ว", "✓ Link copied") : t("🔗 คัดลอกลิงก์ไว้ค้นหาอีกครั้ง", "🔗 Copy link for another search")}
           </button>
         </div>
 
         <button type="button" className="btn-ghost" onClick={onClose}>
-          ค้นหาป้ายอื่น
+          {t("ค้นหาป้ายอื่น", "Search another plate")}
         </button>
       </div>
     </div>
@@ -527,12 +552,13 @@ function SearchPopup({
 /** Server-side "ฝากตามหา" entries this browser owns (phone + name stored on the
  * server). The owner cancels theirs here with the token kept in localStorage. */
 function MyWatchesList({ onPick }: { onPick: (q: PlateQuery) => void }) {
+  const { locale, t } = useLanguage();
   const watches = useMyWatches();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   if (watches.length === 0) return null;
   async function cancel(w: MyWatch) {
-    if (!confirm(`ยกเลิกคำฝากตามหา ${w.prefix}${w.number} ${w.province}?`)) return;
+    if (!confirm(locale === "en" ? `Cancel the alert for ${w.prefix}${w.number} ${w.province}?` : `ยกเลิกคำฝากตามหา ${w.prefix}${w.number} ${w.province}?`)) return;
     setBusy(w.id);
     setError("");
     try {
@@ -552,15 +578,17 @@ function MyWatchesList({ onPick }: { onPick: (q: PlateQuery) => void }) {
   }
   return (
     <section className="rounded-2xl border border-brand/40 bg-brand/5 p-3">
-      <h3 className="mb-2 text-sm font-semibold">📮 ฝากตามหาที่ทิ้งเบอร์ไว้ ({watches.length})</h3>
+      <h3 className="mb-2 text-sm font-semibold">
+        {locale === "en" ? `📮 Alerts with contact details (${watches.length})` : `📮 ฝากตามหาที่ทิ้งเบอร์ไว้ (${watches.length})`}
+      </h3>
       <ul className="flex flex-col gap-2">
         {watches.map((w) => (
           <li key={w.id} className="flex items-center gap-2">
-            <button type="button" onClick={() => onPick(w)} title="ค้นหาอีกครั้ง">
+            <button type="button" onClick={() => onPick(w)} title={t("ค้นหาอีกครั้ง", "Search again")}>
               <PlateBadge prefix={w.prefix} number={w.number} province={w.province} size="sm" />
             </button>
             <span className="flex-1 text-xs text-ink-3">
-              ในชื่อ <b className="text-ink">{w.name}</b> · ฝากไว้ {timeAgo(w.since)}
+              {t("ในชื่อ", "For")} <b className="text-ink">{w.name}</b> · {t("ฝากไว้", "Created")} {timeAgo(w.since, locale)}
             </span>
             <button
               type="button"
@@ -568,32 +596,35 @@ function MyWatchesList({ onPick }: { onPick: (q: PlateQuery) => void }) {
               disabled={busy === w.id}
               onClick={() => cancel(w)}
             >
-              {busy === w.id ? "…" : "ยกเลิก"}
+              {busy === w.id ? "…" : t("ยกเลิก", "Cancel")}
             </button>
           </li>
         ))}
       </ul>
-      {error && <p className="mt-2 text-xs text-warn">{error}</p>}
+      {error && <p className="mt-2 text-xs text-warn">{t(error)}</p>}
     </section>
   );
 }
 
 /** Plates this browser asked us to keep looking for, with a way to drop them. */
 function WatchList({ onPick }: { onPick: (q: PlateQuery) => void }) {
+  const { locale, t } = useLanguage();
   const watches = useWatches();
   if (watches.length === 0) return null;
   return (
     <section className="rounded-2xl border border-line p-3">
-      <h3 className="mb-2 text-sm font-semibold">🔔 ป้ายที่ฝากตามหา ({watches.length})</h3>
+      <h3 className="mb-2 text-sm font-semibold">
+        {locale === "en" ? `🔔 Browser alerts (${watches.length})` : `🔔 ป้ายที่ฝากตามหา (${watches.length})`}
+      </h3>
       <ul className="flex flex-col gap-2">
         {watches.map((w) => (
           <li key={`${w.prefix}${w.number}${w.province}`} className="flex items-center gap-2">
-            <button type="button" onClick={() => onPick(w)} title="ค้นหาอีกครั้ง">
-              <PlateBadge prefix={w.prefix} number={w.number} province={w.province} size="sm" emptyProvince="ทุกจังหวัด" />
+            <button type="button" onClick={() => onPick(w)} title={t("ค้นหาอีกครั้ง", "Search again")}>
+              <PlateBadge prefix={w.prefix} number={w.number} province={w.province} size="sm" emptyProvince={t("ทุกจังหวัด", "All provinces")} />
             </button>
-            <span className="flex-1 text-xs text-ink-3">ฝากไว้ {timeAgo(w.since)}</span>
+            <span className="flex-1 text-xs text-ink-3">{t("ฝากไว้", "Created")} {timeAgo(w.since, locale)}</span>
             <button type="button" className="text-xs text-ink-3 hover:text-red-400" onClick={() => removeWatch(w)}>
-              เลิกตามหา
+              {t("เลิกตามหา", "Stop alert")}
             </button>
           </li>
         ))}

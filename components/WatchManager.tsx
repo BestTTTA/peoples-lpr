@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import ContactChannels from "@/components/ContactChannels";
+import { useLanguage } from "@/components/LanguageProvider";
 import PlateBadge from "@/components/PlateBadge";
 import ProvinceInput from "@/components/ProvinceInput";
 import { clientUuid } from "@/lib/client-uuid";
@@ -19,6 +20,7 @@ type ManagedWatch = {
 };
 
 export default function WatchManager() {
+  const { locale, t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [prefix, setPrefix] = useState("");
   const [number, setNumber] = useState("");
@@ -172,7 +174,7 @@ export default function WatchManager() {
   if (!open)
     return (
       <button type="button" className="btn-ghost w-full text-sm" onClick={() => setOpen(true)}>
-        จัดการรายการฝากหาป้าย
+        {t("จัดการรายการฝากหาป้าย", "Manage missing-plate alerts")}
       </button>
     );
 
@@ -180,10 +182,10 @@ export default function WatchManager() {
     <section className="rounded-2xl border border-brand/40 bg-brand/5 p-3">
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold">จัดการรายการฝากหาป้าย</h3>
-          <p className="text-xs text-ink-3">กรอกข้อมูลป้ายเดิมและรหัสจัดการ 6 หลัก</p>
+          <h3 className="text-sm font-semibold">{t("จัดการรายการฝากหาป้าย", "Manage missing-plate alerts")}</h3>
+          <p className="text-xs text-ink-3">{t("กรอกข้อมูลป้ายเดิมและรหัสจัดการ 6 หลัก", "Enter the original plate details and your 6-digit management code")}</p>
         </div>
-        <button type="button" className="icon-btn shrink-0" aria-label="ปิด" onClick={() => setOpen(false)}>
+        <button type="button" className="icon-btn shrink-0" aria-label={t("ปิด", "Close")} onClick={() => setOpen(false)}>
           ✕
         </button>
       </div>
@@ -191,28 +193,28 @@ export default function WatchManager() {
       {!watch ? (
         <div className="flex flex-col gap-2">
           <div className="grid grid-cols-2 gap-2">
-            <input className="field" placeholder="หมวดอักษร" maxLength={5} value={prefix} onChange={(e) => setPrefix(e.target.value)} />
+            <input className="field" placeholder={t("หมวดอักษร", "Plate letters")} maxLength={5} value={prefix} onChange={(e) => setPrefix(e.target.value)} />
             <input
               className="field"
-              placeholder="เลขทะเบียน"
+              placeholder={t("เลขทะเบียน", "Plate number")}
               inputMode="numeric"
               maxLength={4}
               value={number}
               onChange={(e) => setNumber(e.target.value.replace(/\D/g, ""))}
             />
           </div>
-          <ProvinceInput value={province} onChange={setProvince} />
+          <ProvinceInput value={province} onChange={setProvince} placeholder={t("พิมพ์ชื่อจังหวัด เช่น กทม, ชลบุรี", "Enter a province, e.g. Bangkok or Chon Buri")} />
           <input
             className="field text-center font-mono text-lg tracking-[0.3em]"
-            aria-label="รหัสจัดการ 6 หลัก"
-            placeholder="รหัส 6 หลัก"
+            aria-label={t("รหัสจัดการ 6 หลัก", "6-digit management code")}
+            placeholder={t("รหัส 6 หลัก", "6-digit code")}
             inputMode="numeric"
             maxLength={6}
             value={managementCode}
             onChange={(e) => setManagementCode(e.target.value.replace(/\D/g, ""))}
           />
           <button type="button" className="btn-primary" disabled={!lookupValid || busy} onClick={() => request("POST")}>
-            {busy ? "กำลังตรวจสอบ…" : "ตรวจสอบรายการ"}
+            {busy ? t("กำลังตรวจสอบ…", "Checking…") : t("ตรวจสอบรายการ", "Check alert")}
           </button>
         </div>
       ) : (
@@ -245,32 +247,34 @@ export default function WatchManager() {
             </label>
           </div>
           <label className="text-sm font-medium">
-            จังหวัด
-            <ProvinceInput className="mt-1" value={newProvince} onChange={setNewProvince} />
+            {t("จังหวัด", "Province")}
+            <ProvinceInput className="mt-1" value={newProvince} onChange={setNewProvince} placeholder={t("เลือกจังหวัด", "Select a province")} />
           </label>
           <div className="flex gap-2">
             <button type="button" className="btn-primary flex-1" disabled={!editValid || busy} onClick={() => request("PATCH")}>
-              {busy ? "กำลังบันทึก…" : "บันทึกการแก้ไข"}
+              {busy ? t("กำลังบันทึก…", "Saving…") : t("บันทึกการแก้ไข", "Save changes")}
             </button>
             <button
               type="button"
               className="btn-ghost text-red-400"
               disabled={busy}
-              onClick={() => confirm(`ยกเลิกการตามหา ${newPrefix}${newNumber} ${newProvince}?`) && request("DELETE")}
+              onClick={() => confirm(locale === "en" ? `Cancel the alert for ${newPrefix}${newNumber} ${newProvince}?` : `ยกเลิกการตามหา ${newPrefix}${newNumber} ${newProvince}?`) && request("DELETE")}
             >
-              ยกเลิกการตามหา
+              {t("ยกเลิกการตามหา", "Cancel alert")}
             </button>
           </div>
           <button type="button" className="text-xs text-ink-3" onClick={() => setWatch(null)}>
-            ← ใช้ข้อมูลป้ายอื่น
+            {t("← ใช้ข้อมูลป้ายอื่น", "← Use another plate")}
           </button>
         </div>
       )}
 
-      {message && <p className="mt-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">{message}</p>}
-      {error && <p className="mt-2 text-sm text-warn">{error}</p>}
+      {message && <p className="mt-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">{t(message)}</p>}
+      {error && <p className="mt-2 text-sm text-warn">{t(error)}</p>}
       {failedAttempts > 0 && failedAttempts < 3 && !watch && (
-        <p className="mt-1 text-xs text-ink-3">กรอกไม่ถูกต้อง {failedAttempts} ครั้ง — หากครบ 3 ครั้ง สามารถติดต่อ Admin หรือยื่นคำขอเปลี่ยนรหัสได้</p>
+        <p className="mt-1 text-xs text-ink-3">
+          {locale === "en" ? `Incorrect code ${failedAttempts} time(s). After 3 attempts, contact an admin or request a new code.` : `กรอกไม่ถูกต้อง ${failedAttempts} ครั้ง — หากครบ 3 ครั้ง สามารถติดต่อ Admin หรือยื่นคำขอเปลี่ยนรหัสได้`}
+        </p>
       )}
 
       {helpOpen && (
@@ -281,9 +285,9 @@ export default function WatchManager() {
         >
           <div role="dialog" aria-modal="true" aria-labelledby="watch-help-title" className="card flex max-h-[90vh] w-full max-w-md flex-col gap-4 overflow-y-auto p-5">
             <div>
-              <h2 id="watch-help-title" className="text-lg font-bold">กรอกรหัสจัดการไม่ถูกต้อง 3 ครั้ง</h2>
+              <h2 id="watch-help-title" className="text-lg font-bold">{t("กรอกรหัสจัดการไม่ถูกต้อง 3 ครั้ง", "The management code was incorrect 3 times")}</h2>
               <p className="mt-1 text-sm text-ink-3">
-                เลือกติดต่อ Admin โดยตรง หรือยื่นคำขอเปลี่ยนรหัสเพื่อรอ Admin ตรวจสอบและอนุมัติ
+                {t("เลือกติดต่อ Admin โดยตรง หรือยื่นคำขอเปลี่ยนรหัสเพื่อรอ Admin ตรวจสอบและอนุมัติ", "Contact an admin directly or request a new code for administrator review and approval.")}
               </p>
             </div>
 
@@ -296,7 +300,7 @@ export default function WatchManager() {
                   setResetForm(false);
                 }}
               >
-                ติดต่อ Admin
+                {t("ติดต่อ Admin", "Contact admin")}
               </button>
               <button
                 type="button"
@@ -306,7 +310,7 @@ export default function WatchManager() {
                   setShowContact(false);
                 }}
               >
-                ยื่นเรื่องขอเปลี่ยนรหัส
+                {t("ยื่นเรื่องขอเปลี่ยนรหัส", "Request a new code")}
               </button>
             </div>
 
@@ -315,12 +319,12 @@ export default function WatchManager() {
             {resetForm && (
               <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface-2/40 p-3">
                 <div>
-                  <h3 className="font-semibold">ยื่นคำขอเปลี่ยนรหัสจัดการ</h3>
-                  <p className="mt-1 text-xs text-ink-3">กรอกเบอร์โทรเดียวกับที่ใช้ฝากหาป้าย และกำหนดรหัสใหม่ รหัสจะยังไม่เปลี่ยนจนกว่า Admin จะอนุมัติ</p>
+                  <h3 className="font-semibold">{t("ยื่นคำขอเปลี่ยนรหัสจัดการ", "Request a new management code")}</h3>
+                  <p className="mt-1 text-xs text-ink-3">{t("กรอกเบอร์โทรเดียวกับที่ใช้ฝากหาป้าย และกำหนดรหัสใหม่ รหัสจะยังไม่เปลี่ยนจนกว่า Admin จะอนุมัติ", "Enter the phone number used for the alert and choose a new code. The code changes only after administrator approval.")}</p>
                 </div>
                 <input
                   className="field"
-                  placeholder="ชื่อผู้ยื่นคำขอ"
+                  placeholder={t("ชื่อผู้ยื่นคำขอ", "Requester name")}
                   maxLength={60}
                   value={requesterName}
                   onChange={(event) => setRequesterName(event.target.value)}
@@ -329,7 +333,7 @@ export default function WatchManager() {
                   className="field"
                   type="tel"
                   inputMode="tel"
-                  placeholder="เบอร์โทรที่ใช้ฝากหาป้าย"
+                  placeholder={t("เบอร์โทรที่ใช้ฝากหาป้าย", "Phone number used for the alert")}
                   maxLength={40}
                   value={requesterPhone}
                   onChange={(event) => setRequesterPhone(event.target.value)}
@@ -338,7 +342,7 @@ export default function WatchManager() {
                   <input
                     className="field text-center font-mono tracking-[0.2em]"
                     inputMode="numeric"
-                    placeholder="รหัสใหม่ 6 หลัก"
+                    placeholder={t("รหัสใหม่ 6 หลัก", "New 6-digit code")}
                     maxLength={6}
                     value={newManagementCode}
                     onChange={(event) => setNewManagementCode(event.target.value.replace(/\D/g, ""))}
@@ -346,22 +350,22 @@ export default function WatchManager() {
                   <input
                     className="field text-center font-mono tracking-[0.2em]"
                     inputMode="numeric"
-                    placeholder="ยืนยันรหัสใหม่"
+                    placeholder={t("ยืนยันรหัสใหม่", "Confirm new code")}
                     maxLength={6}
                     value={confirmManagementCode}
                     onChange={(event) => setConfirmManagementCode(event.target.value.replace(/\D/g, ""))}
                   />
                 </div>
-                {resetError && <p className="text-sm text-warn">{resetError}</p>}
-                {resetMessage && <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">{resetMessage}</p>}
+                {resetError && <p className="text-sm text-warn">{t(resetError)}</p>}
+                {resetMessage && <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-400">{t(resetMessage)}</p>}
                 <button type="button" className="btn-primary w-full" disabled={!resetValid || resetBusy || !!resetMessage} onClick={submitResetRequest}>
-                  {resetBusy ? "กำลังส่งคำขอ…" : "ส่งให้ Admin อนุมัติ"}
+                  {resetBusy ? t("กำลังส่งคำขอ…", "Sending request…") : t("ส่งให้ Admin อนุมัติ", "Send for admin approval")}
                 </button>
               </div>
             )}
 
             <button type="button" className="btn-ghost w-full" onClick={() => setHelpOpen(false)}>
-              ปิด
+              {t("ปิด", "Close")}
             </button>
           </div>
         </div>

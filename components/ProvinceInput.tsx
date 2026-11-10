@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { useLanguage } from "@/components/LanguageProvider";
 import { filterProvinces, isProvince } from "@/lib/provinces";
 
 // Touch screens get a full-screen picker with the search box on top: a dropdown
@@ -35,10 +36,12 @@ export default function ProvinceInput(props: Props) {
 function ProvinceCombobox({
   value,
   onChange,
-  placeholder = "พิมพ์ชื่อจังหวัด เช่น กทม, ชลบุรี",
+  placeholder,
   className = "",
   emptyLabel,
 }: Props) {
+  const { t } = useLanguage();
+  const resolvedPlaceholder = placeholder ?? t("พิมพ์ชื่อจังหวัด เช่น กทม, ชลบุรี", "Type a province, e.g. Bangkok or Chonburi");
   const [text, setText] = useState(value);
   const [synced, setSynced] = useState(value);
   const [open, setOpen] = useState(false);
@@ -72,7 +75,7 @@ function ProvinceCombobox({
         aria-invalid={invalid}
         className={`field ${invalid ? "border-warn" : ""}`}
         value={text}
-        placeholder={emptyLabel && !value ? emptyLabel : placeholder}
+        placeholder={emptyLabel && !value ? emptyLabel : resolvedPlaceholder}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
         onChange={(e) => {
@@ -130,7 +133,9 @@ function ProvinceCombobox({
   );
 }
 
-function ProvinceSheet({ value, onChange, placeholder = "เลือกจังหวัด", className = "", emptyLabel }: Props) {
+function ProvinceSheet({ value, onChange, placeholder, className = "", emptyLabel }: Props) {
+  const { t } = useLanguage();
+  const resolvedPlaceholder = placeholder ?? t("เลือกจังหวัด", "Select province");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const input = useRef<HTMLInputElement>(null);
@@ -158,20 +163,20 @@ function ProvinceSheet({ value, onChange, placeholder = "เลือกจั�
         className={`field flex items-center justify-between text-left ${value ? "" : "text-ink-3"}`}
         onClick={() => setOpen(true)}
       >
-        <span className="truncate">{value || emptyLabel || placeholder}</span>
+        <span className="truncate">{value || emptyLabel || resolvedPlaceholder}</span>
         <span aria-hidden className="text-ink-3">
           ▾
         </span>
       </button>
       {open &&
         createPortal(
-          <div role="dialog" aria-modal="true" aria-label="เลือกจังหวัด" className="fixed inset-0 z-[80] flex flex-col bg-paper">
+          <div role="dialog" aria-modal="true" aria-label={t("เลือกจังหวัด", "Select province")} className="fixed inset-0 z-[80] flex flex-col bg-paper">
             <div className="flex items-center gap-2 border-b border-line p-3">
               <input
                 ref={input}
                 type="search"
                 className="field flex-1"
-                placeholder="ค้นหาจังหวัด เช่น กทม, ชล, เชียง"
+                placeholder={t("ค้นหาจังหวัด เช่น กทม, ชล, เชียง", "Search provinces, e.g. Bangkok or Chonburi")}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
@@ -182,7 +187,7 @@ function ProvinceSheet({ value, onChange, placeholder = "เลือกจั�
                 }}
               />
               <button type="button" className="btn-ghost shrink-0 px-3" onClick={() => setOpen(false)}>
-                ปิด
+                {t("ปิด", "Close")}
               </button>
             </div>
             <ul role="listbox" className="min-h-0 flex-1 overflow-y-auto">
@@ -199,7 +204,7 @@ function ProvinceSheet({ value, onChange, placeholder = "เลือกจั�
                   </button>
                 </li>
               ))}
-              {options.length === 0 && <li className="px-4 py-6 text-center text-sm text-ink-3">ไม่พบจังหวัดนี้</li>}
+              {options.length === 0 && <li className="px-4 py-6 text-center text-sm text-ink-3">{t("ไม่พบจังหวัดนี้", "Province not found")}</li>}
             </ul>
           </div>,
           document.body,
